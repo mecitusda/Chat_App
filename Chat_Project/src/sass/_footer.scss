@@ -1,0 +1,51 @@
+@use 'variables';
+
+#footer{
+    &__inner{
+        width: 100%;
+        background-color: variables.$primary-color;
+        color: variables.$light-color;
+       .footer-content{
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: 3rem;
+        padding: 1rem 2rem;
+        .footer{
+            
+            &__links{
+                font-size: 1.4rem;
+                text-align: center;
+                li{
+                    padding: 0.5rem 0;
+                    a{  
+                        font-weight: 500;
+                        color: variables.$light-color;
+                        &:hover{
+                            color: variables.$medium-color;
+                            transition: color 0.3s ease;
+                        }
+                    }
+                }
+            }
+            &__socials{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 1rem;
+                .fab{
+                    font-size: 3rem;
+                    color: variables.$light-color;
+                    transition: color 0.3s ease;
+                    &:hover{
+                        color: variables.$medium-color;
+                    }
+                }
+        }
+        }
+           :last-child{
+                grid-area: 2 / 1 / span 1 / span 2;
+                text-align: center;
+            }
+       }
+    }
+}
