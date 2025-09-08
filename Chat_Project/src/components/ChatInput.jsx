@@ -99,7 +99,7 @@ export default function ChatInput({
 
   async function presignAndUpload({ file, conversationId }) {
     const { data } = await axios.get(
-      "http://127.0.0.1:5000/api/file/presigned-url/message",
+      "https://chat-app-backend-yziq.onrender.com/api/file/presigned-url/message",
       { params: { conversationId, fileType: file.type } }
     );
     const { uploadURL, mediaKey } = data || {};

@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-  origin: ["http://127.0.0.1:5173","http://localhost:5173","http://127.0.0.1:58143"],  // frontend adresini buraya yaz
+  origin: ["https://chat-app-website-vyth.onrender.com","http://localhost:5173","http://127.0.0.1:58143"],  // frontend adresini buraya yaz
   credentials: true,                  // istersen
 }));
 
