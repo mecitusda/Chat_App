@@ -5,7 +5,7 @@
 .container{
     max-width: variables.$max-width;
     margin:auto;
-    padding: 0 1.4rem;
+    padding: 0 
 }
 
 //buttons
@@ -608,9 +608,18 @@ input[class^='btn-']:hover
   .btn { flex:0 0 auto; white-space: nowrap; padding:.4rem .8rem; font-size:1.2rem; }
 }
 
-/* Dar genişlikte: 1 sütuna düş ve butonları alta al */
-@media (max-width: 720px) {
-  .message__file {
+
+
+
+@media (max-width: 576px) {
+  
+  .container{
+      max-width: 960px !important;
+      height: 95vh !important;
+      width: 99% !important;
+    }
+
+   .message__file {
     grid-template-columns: 1fr;           // tek sütun
     align-items: stretch;
   }
@@ -619,10 +628,27 @@ input[class^='btn-']:hover
     margin-top: .4rem;
     .btn { padding:.35rem .7rem; font-size:1.15rem; }
   }
+
+
+   .message__file-name { max-width: 100%; }
+  .message__file-actions { flex-wrap: wrap; gap:.5rem; }
 }
 
-/* Çok dar balonlar için ekstra güvenlik (balon < 360px ise) */
-@media (max-width: 360px) {
-  .message__file-name { max-width: 100%; }
-  .message__file-actions { flex-wrap: wrap; gap:.5rem; }
+@media (min-width: 577px) and (max-width: 992px) {
+  
+  .container{
+      max-width: 960px !important;
+      height: 95vh !important;
+      width: 95% !important;
+    }
+
+   .message__file {
+    grid-template-columns: 1fr;           // tek sütun
+    align-items: stretch;
+  }
+  .message__file-actions {
+    justify-self: start;
+    margin-top: .4rem;
+    .btn { padding:.35rem .7rem; font-size:1.15rem; }
+  }
 }

@@ -7,7 +7,7 @@ import axios from "axios";
 dotenv.config();
 
 const PORT = process.env.SOCKET_PORT || 3500;
-
+const BACKEND_URL = process.env.BACKEND_URL;
 const app = express();
 const server = createServer(app);
 
@@ -19,7 +19,7 @@ const lastSeenByUser = new Map(); // userId -> timestamp (ms) - İleride docker 
 
 const getLastSeens = async () => {
   setTimeout(async()=> {
-  await axios.get("https://chat-app-backend-yziq.onrender.com/api/conversation/last-seen").then((response)=>{
+  await axios.get(`${BACKEND_URL}/api/conversation/last-seen`).then((response)=>{
     Object.entries(response.data.lastSeen).forEach(([userId,isoDate])=>{
        const timestamp = new Date(isoDate).getTime();
   if (!isNaN(timestamp)) {
@@ -53,7 +53,7 @@ async function deliveredFromBatch({ batch, conversationId, viewerId }) {
 
   if (!toDeliver.length) return;
 
-  await axios.patch("https://chat-app-backend-yziq.onrender.com/api/conversation/message/status", {
+  await axios.patch(`${BACKEND_URL}/api/conversation/message/status`, {
     ids: toDeliver,
     action: "delivered",
     by: viewerId,
@@ -69,38 +69,7 @@ async function deliveredFromBatch({ batch, conversationId, viewerId }) {
   });
 }
 
-// async function readFromBatch({ batch, conversationId, viewerId }) {
-//   const arr = batch?.messages || batch || [];
-//   const toRead = arr
-//     // kendi gönderdiğin mesajları "okundu" işaretleme
-//     .filter(m => String(m.sender?._id || m.sender) !== String(viewerId))
-//     // bu user zaten daha önce okuduysa tekrar ekleme
-//     .filter(m => !(m.readBy || []).some(x => String(x.user) === String(viewerId)))
-//     .map(m => m._id);
 
-//   if (!toRead.length) return;
-
-//   // DB güncelle
-//   await axios.patch("https://chat-app-backend-yziq.onrender.com/api/conversation/message/status", {
-//     ids: toRead,
-//     action: "read",
-//     by: viewerId,
-//   });
-
-//   // odaya broadcast et (ikonları güncellemek için)
-//   io.to(`conv:${conversationId}`).emit("message:status-update", {
-//     messageIds: toRead,
-//     conversationId,
-//     action: "read",
-//     by: viewerId,
-//     at: Date.now(),
-//   });
-// }
-
-
-// function joinRoom(socket, conversationId) {
-//   if (conversationId) socket.join(conversationId);
-// }
 
 const io = new Server(server, {
   cors: {
@@ -112,38 +81,7 @@ const io = new Server(server, {
 });
 io.on("connection", (socket) => {   
   let currentUserId = null;
-  //console.log("User connected:", socket.id);
   
-  // socket.on("join", async (userId) => {
-  //   currentUserId = String(userId);
-  //   socket.data.userId = String(userId || "");
-  //   console.log(`${userId} joined`);
-    
-  //   if (!socketsByUser.has(currentUserId)) socketsByUser.set(currentUserId, new Set());
-  //   socketsByUser.get(currentUserId).add(socket.id);
-
-  //   socket.join(`user:${currentUserId}`);
-  //   emitPresence(currentUserId, true);
-  //    try {
-
-  //     const lastSeen = lastSeenByUser.get(currentUserId) || 0;
-  //     await axios.patch(`https://chat-app-backend-yziq.onrender.com/api/conversation/message/mark-delivered`, {
-  //     by: currentUserId,
-  //     since: lastSeen,
-  //   });
-  //     // Başka API sunucusundan chat listesini çek
-  //     const response = await axios.get(`https://chat-app-backend-yziq.onrender.com/api/conversation/${userId}`);
-
-  //     const conversations = response.data;
-
-  //     // Chat listesini socket ile gönder
-  //     socket.emit("chatList", conversations);
-  //     console.log(`${userId} joined, chat list sent via API.`);
-  //   } catch (err) {
-  //     console.error("join error:", err);
-  //     socket.emit("error", "Chat listesi alınamadı");
-  //   }
-  // });
 
   socket.on("join", async ({userId,last_seen}) => {
   currentUserId = String(userId);
@@ -158,7 +96,7 @@ io.on("connection", (socket) => {
 
     // 2) DB'de bu user için sent → delivered patch et
     const { data } = await axios.patch(
-      "https://chat-app-backend-yziq.onrender.com/api/conversation/message/mark-delivered",
+      `${BACKEND_URL}/api/conversation/message/mark-delivered`,
       {
         by: currentUserId,
         since: last_seen,
@@ -191,7 +129,7 @@ io.on("connection", (socket) => {
 
     // 4) Chat listesini getir
     const response = await axios.get(
-      `https://chat-app-backend-yziq.onrender.com/api/conversation/${userId}`
+      `${BACKEND_URL}/api/conversation/${userId}`
     );
     
     const conversations = response.data;
@@ -274,7 +212,7 @@ io.on("connection", (socket) => {
       //   clientTempId,     // UI’daki temp id
       // })
       const { data } = await axios.post(
-        `https://chat-app-backend-yziq.onrender.com/api/conversation/message`,
+        `${BACKEND_URL}/api/conversation/message`,
         {
           conversation:conversationId,
           sender,
@@ -305,7 +243,7 @@ io.on("connection", (socket) => {
         message:"mesaj gönderildi."
       });
 
-      const responsemembers = await axios.get(`https://chat-app-backend-yziq.onrender.com/api/conversation/${conversationId}/members`)
+      const responsemembers = await axios.get(`${BACKEND_URL}/api/conversation/${conversationId}/members`)
       for (const m of responsemembers.data?.members) {
         io.to(`user:${m}`).emit("chatList:update", 
           data?.chat
@@ -324,7 +262,7 @@ io.on("connection", (socket) => {
 
   socket.on("messages", async ({conversationId,limit}) => {
     try {
-      const {data} = await axios.get(`https://chat-app-backend-yziq.onrender.com/api/conversation/messages/${conversationId}?limit=${limit || 50}&userId=${currentUserId}`);//header eklenince userId headerdan alınacak.
+      const {data} = await axios.get(`${BACKEND_URL}/api/conversation/messages/${conversationId}?limit=${limit || 50}&userId=${currentUserId}`);//header eklenince userId headerdan alınacak.
       //console.log("döndürülen data: ",{conversationId,...data})
       // Mesajları socket ile gönder
       socket.emit("messageList", {conversationId,...data,message:"mesajlar çekildi."});
@@ -336,7 +274,7 @@ io.on("connection", (socket) => {
 
   socket.on("messages-after",async ({ conversationId, after, limit })=>{
     try{
-      const {data} = await axios.get(`https://chat-app-backend-yziq.onrender.com/api/conversation/messages/${conversationId}?limit=${limit || 50}&after=${after}&userId=${currentUserId}`)
+      const {data} = await axios.get(`${BACKEND_URL}/api/conversation/messages/${conversationId}?limit=${limit || 50}&after=${after}&userId=${currentUserId}`)
       socket.emit("messageList", {conversationId,...data,message:"after"} );
       const viewerId = socket.data.userId || currentUserId;
     if (viewerId) {
@@ -354,7 +292,7 @@ io.on("connection", (socket) => {
 
   socket.on("messages-before", async ({ conversationId, before, limit }) => {
   try {
-    const url = `https://chat-app-backend-yziq.onrender.com/api/conversation/messages/${conversationId}?before=${before}&limit=${limit || 50}`;
+    const url = `${BACKEND_URL}/api/conversation/messages/${conversationId}?before=${before}&limit=${limit || 50}`;
     const {data} = await axios.get(url);
     socket.emit("messageList", {conversationId,...data,message:"before"}); // tek event
   } catch (err) {
@@ -365,7 +303,7 @@ io.on("connection", (socket) => {
 
   socket.on("pre-signature-file",async ({mediaKeys,conversationId}) => {
     try{
-      const response = await axios.post(`https://chat-app-backend-yziq.onrender.com/api/file/presigned-url/files`,{
+      const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/files`,{
        mediaKeys
       })
       const urls = response.data;
@@ -399,7 +337,7 @@ io.on("connection", (socket) => {
   socket.on("message:delivered", async ({ messageId, conversationId, userId }) => {
   try {
     console.log("iletildi: ",{ messageId, conversationId, userId })
-    await axios.patch("https://chat-app-backend-yziq.onrender.com/api/conversation/message/status", {
+    await axios.patch(`${BACKEND_URL}/api/conversation/message/status`, {
       ids: [messageId],
       action: "delivered",
       by: userId,
@@ -418,7 +356,7 @@ io.on("connection", (socket) => {
 
 socket.on("message:read", async ({ messageIds = [], conversationId, userId }) => {
   try {
-    await axios.patch("https://chat-app-backend-yziq.onrender.com/api/conversation/message/status", {
+    await axios.patch(`${BACKEND_URL}/api/conversation/message/status`, {
       ids: messageIds,
       action: "read",
       by: userId,
@@ -448,7 +386,7 @@ socket.on("message:read", async ({ messageIds = [], conversationId, userId }) =>
       lastSeenByUser.set(currentUserId, Date.now());
       emitPresence(currentUserId, false);
     }
-    await axios.patch(`https://chat-app-backend-yziq.onrender.com/api/conversation/user/last_seen/${currentUserId}`)
+    await axios.patch(`${BACKEND_URL}/api/conversation/user/last_seen/${currentUserId}`)
   });
 });
 

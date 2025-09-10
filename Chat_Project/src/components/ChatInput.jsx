@@ -12,6 +12,7 @@ import PlusMenu from "./PlusMenu";
  * - onAckReplace(tempId, serverMsg)
  * - onAckStatus(tempId, status)
  */
+
 export default function ChatInput({
   socket,
   conversationId,
@@ -99,7 +100,7 @@ export default function ChatInput({
 
   async function presignAndUpload({ file, conversationId }) {
     const { data } = await axios.get(
-      "https://chat-app-backend-yziq.onrender.com/api/file/presigned-url/message",
+      `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/message`,
       { params: { conversationId, fileType: file.type } }
     );
     const { uploadURL, mediaKey } = data || {};

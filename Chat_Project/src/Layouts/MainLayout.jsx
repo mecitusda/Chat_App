@@ -8,7 +8,7 @@ import { resetMessages } from "../slices/messageSlice.js";
 import { useDispatch } from "react-redux";
 // import { ThemeContext } from "../contexts/ThemeContext";
 const MainLayout = ({}) => {
-  const SOCKET_URL = "https://chat-app-socket-5mo2.onrender.com";
+  const SOCKET_URL = import.meta.env.VITE_BACKEND_SOCKET_URL;
   const dispatch = useDispatch();
   //dispatch(resetConversation());
   //dispatch(resetMessages());
