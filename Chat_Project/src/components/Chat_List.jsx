@@ -146,7 +146,7 @@ const ChatList = ({ conversations, userId, setActiveConversation, status }) => {
                 </div>
 
                 <div className="chat__time">
-                  <span className="chat__time">
+                  <span>
                     {formatSimpleTime(
                       lastMsg?.message?.updatedAt || lastMsg?.updatedAt || ""
                     )}
