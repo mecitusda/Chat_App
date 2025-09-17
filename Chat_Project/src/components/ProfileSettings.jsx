@@ -100,10 +100,13 @@ export default function ProfileSettings() {
   const handleAboutUpdate = async () => {
     try {
       setIsUpdating(true);
-      const resp = await axios.patch("/api/user/profile", {
-        user_id: user._id,
-        about,
-      });
+      const resp = await axios.patch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
+        {
+          user_id: user._id,
+          about,
+        }
+      );
       if (resp.data.success) {
         setAbout(resp.data.user.about);
         setIsEditingAbout(false);
@@ -178,11 +181,9 @@ export default function ProfileSettings() {
             <div className="editable__display">
               <span>{name}</span>
               <span
-                className="edit-icon"
+                className="edit-icon fa-solid fa-pen-to-square"
                 onClick={() => setIsEditingName(true)}
-              >
-                ✏️
-              </span>
+              ></span>
             </div>
           )}
         </div>
@@ -210,11 +211,9 @@ export default function ProfileSettings() {
             <div className="editable__display">
               <span>{about || "Henüz bir açıklama eklenmedi"}</span>
               <span
-                className="edit-icon"
+                className="edit-icon fa-solid fa-pen-to-square"
                 onClick={() => setIsEditingAbout(true)}
-              >
-                <i src={"../public/icons/pencil.png"}></i>
-              </span>
+              ></span>
             </div>
           )}
         </div>
