@@ -4,10 +4,12 @@ import ChatList from "../components/Chat_List";
 import Option2 from "../components/Option2";
 import Option3 from "../components/Option3";
 import Option4 from "../components/Option4";
+import ProfileSettings from "../components/ProfileSettings";
 import ChatPanel from "../components/ChatPanel";
 import { useSocket } from "../hooks/useSocket";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAtBottom } from "../slices/uiSlice";
+import { store } from "../store/index";
 // Conversations
 import {
   addOrUpdateConversations,
@@ -42,23 +44,25 @@ import {
   // resetAllPagination,
 } from "../slices/paginationSlice";
 import { useOutletContext } from "react-router";
-import { useUserId } from "../contextAPI/UserContext";
+import { useUser } from "../contextAPI/UserContext";
 
 const Chat = () => {
   const { activeConversation, setActiveConversation, SOCKET_URL } =
     useOutletContext();
-  const userId = useUserId().userId;
+  const { user } = useUser();
 
+  const userId = user?._id;
+  //console.log("user: ", user);
+  const [activeConversationId, setactiveConversationId] = useState(null);
   const dispatch = useDispatch();
-
   // Global state
-  const conversations = useSelector((s) => s.conversations?.list || []);
+
+  const conversations = useSelector((s) => s.conversations.list || []);
   const messagesByConv = useSelector((s) => s.messages?.byConversation || {});
   const filesByConv = useSelector((s) => s.files?.byKey || {});
   const uis = useSelector((s) => s.ui.atBottomByConv || []);
-  //console.log("mesajlar: ", messagesByConv);
   //console.log("chatler: ", conversations);
-  //console.log("files: ", filesByConv);
+  console.log("files: ", filesByConv);
   //console.log("uis: ", uis);
   // UI state
   const [activePage, setActivePage] = useState("chatList");
@@ -71,13 +75,22 @@ const Chat = () => {
     SOCKET_URL,
     userId,
     addOrUpdateConversations,
-    conversations
+    conversations,
+    dispatch
   );
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const fresh = conversations.find(
+      (c) => String(c._id) === String(activeConversationId)
+    );
+    if (fresh) setActiveConversation(fresh);
+  }, [activeConversationId, conversations]);
 
   // Aynı lastId için üst üste messages-after emit etmemek için guard
   const lastAfterSentRef = useRef({}); // { [convId]: lastAfterId }
 
-  function getTotalUnreadMessages(coversations) {
+  function getTotalUnreadMessages() {
     return conversations.reduce((total, chat) => {
       return total + (chat.unread || 0); // unread değeri yoksa 0 kabul edilir
     }, 0);
@@ -86,6 +99,39 @@ const Chat = () => {
   const activeAtBottom = useSelector((s) =>
     selectAtBottom(s, activeConversation?._id)
   );
+  // === Presigned URL yenileme: ayrı effect (filesByConv bağımlı) ===
+  useEffect(() => {
+    if (!socket) return;
+    const now = Date.now();
+    const avatars = Object.values(filesByConv || {})
+      .flat()
+      .filter(
+        (f) =>
+          (f.type === "avatar" || f.type === "conversation-avatar") &&
+          (!f.expiresAt || f.expiresAt <= now)
+      )
+      .map((f) => f);
+
+    if (avatars.length > 0) {
+      socket.emit("pre-signature-avatars", {
+        mediaKeys: avatars,
+      });
+    }
+    const convId = activeConversation?._id;
+    if (!convId) return;
+
+    const files = filesByConv[convId] || [];
+    const expiredKeys = files
+      .filter((f) => !f.expiresAt || f.expiresAt <= now)
+      .map((f) => f);
+    if (expiredKeys.length > 0) {
+      socket.emit("pre-signature-files", {
+        mediaKeys: expiredKeys,
+        conversationId: convId,
+      });
+    }
+  }, [socket, filesByConv, user, dispatch]);
+
   // === Socket listeners (tek sefer bağla) ===
   useEffect(() => {
     if (!socket) return;
@@ -93,7 +139,8 @@ const Chat = () => {
     const handleMessageList = (newData) => {
       const arr = newData?.messages || [];
       const page = newData?.pageInfo || {};
-      if (page.after) setFetchingNew(false);
+
+      setFetchingNew(false);
 
       const convId =
         newData.conversationId ||
@@ -107,7 +154,7 @@ const Chat = () => {
         );
       }
       if (arr.length === 0) return;
-
+      //console.log("yeni mesaj eklendi. ", newData.text);
       const direction = page.before ? "prepend" : "append";
       dispatch(
         addOrUpdateMessages({
@@ -162,6 +209,41 @@ const Chat = () => {
       }
     };
 
+    const handleAvatarPreUrls = (data) => {
+      if (!data || typeof data !== "object") return;
+      // backend 3600s veriyorsa küçük bir buffer bırak (5 dk)
+      const NOW = Date.now();
+      const ONE_HOUR = 60 * 60 * 1000;
+      const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dk
+      const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
+
+      for (const [conversationId, items] of Object.entries(data)) {
+        const files = (items || [])
+          .filter(
+            (it) =>
+              it &&
+              it.media_key &&
+              (it.type === "avatar" || it.type === "conversation-avatar")
+          )
+          .map((it) => ({
+            media_key: it.media_key,
+            media_url: it.media_url,
+            type: it.type,
+            ownerUserId: it.ownerUserId,
+            ownerConvId: it.ownerConvId,
+            sourceConvId: it.sourceConvId,
+            expiresAt:
+              it.expiresAt && Number.isFinite(it.expiresAt)
+                ? it.expiresAt
+                : DEFAULT_EXPIRES_AT,
+          }));
+
+        if (files.length > 0) {
+          dispatch(upsertFiles({ conversationId, files }));
+        }
+      }
+    };
+
     // 🔧 DÜZELTİLEN KISIM
     const handleStatusUpdate = ({
       messageId,
@@ -188,11 +270,13 @@ const Chat = () => {
 
     socket.on("messageList", handleMessageList);
     socket.on("pre-urls", handlePreUrls);
+    socket.on("pre-avatars", handleAvatarPreUrls);
     socket.on("message:status-update", handleStatusUpdate);
 
     return () => {
       socket.off("messageList", handleMessageList);
       socket.off("pre-urls", handlePreUrls);
+      socket.off("pre-avatars", handleAvatarPreUrls);
       socket.off("message:status-update", handleStatusUpdate);
     };
     // aktif konuşma değişirse fallback convId güncel kalsın:
@@ -211,7 +295,7 @@ const Chat = () => {
 
     if (existing.length === 0) {
       // İlk kez açılıyor → en yeni mesajları çek
-      socket.emit("messages", { conversationId: convId, limit: 2 });
+      socket.emit("messages", { conversationId: convId, limit: 20 });
       // after guard’ını sıfırla
       lastAfterSentRef.current[convId] = null;
     } else {
@@ -226,32 +310,14 @@ const Chat = () => {
         socket.emit("messages-after", {
           conversationId: convId,
           after: lastId,
-          limit: 2,
+          limit: 20,
         });
+
         lastAfterSentRef.current[convId] = lastId;
       }
+      setFetchingNew(false);
     }
-  }, [socket, activeConversation?._id, dispatch, messagesByConv]);
-
-  // === Presigned URL yenileme: ayrı effect (filesByConv bağımlı) ===
-  useEffect(() => {
-    if (!socket) return;
-    const convId = activeConversation?._id;
-    if (!convId) return;
-
-    const now = Date.now();
-    const files = filesByConv[convId] || [];
-    const expiredKeys = files
-      .filter((f) => !f.expiresAt || f.expiresAt <= now)
-      .map((f) => f.media_key);
-
-    if (expiredKeys.length > 0) {
-      socket.emit("pre-signature-file", {
-        mediaKeys: expiredKeys,
-        conversationId: convId,
-      });
-    }
-  }, [socket, activeConversation?._id, filesByConv]);
+  }, [socket, activeConversation?._id, messagesByConv]);
 
   useEffect(() => {
     if (!socket) return;
@@ -262,16 +328,19 @@ const Chat = () => {
       const panelAtBottom = isActiveConv ? activeAtBottom : false;
       const isTabVisible = document.visibilityState === "visible";
       const isFromOther = data?.last_message?.sender?._id !== userId;
-
+      //console.log("chatlistupdate: ,", [data]);
       dispatch(addOrUpdateConversations([data]));
 
       if (isFromOther && (!isActiveConv || !panelAtBottom || !isTabVisible)) {
-        dispatch(
-          incrementUnread({
-            conversationId: convId,
-            by: data?.last_message.sender._id !== userId ? 1 : 0,
-          })
-        );
+        const increment = data?.last_message.sender._id !== userId ? 1 : 0;
+        if (increment === 1) {
+          dispatch(
+            incrementUnread({
+              conversationId: convId,
+              by: 1,
+            })
+          );
+        }
       }
 
       if (isActiveConv && panelAtBottom && isTabVisible && isFromOther) {
@@ -281,6 +350,7 @@ const Chat = () => {
           userId,
         });
       }
+      upsertProfileAvatars(data, userId, dispatch, store.getState);
     };
 
     socket.on("chatList:update", handleChatlistUpdate);
@@ -295,7 +365,7 @@ const Chat = () => {
   const handleOption2Click = () => setActivePage("option2");
   const handleOption3Click = () => setActivePage("option3");
   const handleOption4Click = () => setActivePage("option4");
-
+  const handleSettings = () => setActivePage("profileSettings");
   return (
     <>
       <title>Chat</title>
@@ -346,7 +416,7 @@ const Chat = () => {
               <button
                 className="btn-dark fa-solid fa-circle-user"
                 id="option6"
-                onClick={handleOption2Click}
+                onClick={handleSettings}
               />
             </div>
           </div>
@@ -357,14 +427,15 @@ const Chat = () => {
           <ChatList
             conversations={conversations}
             userId={userId}
-            setActiveConversation={setActiveConversation}
+            setactiveConversationId={setactiveConversationId}
             status={status}
+            messagesByConv={messagesByConv}
           />
         )}
         {activePage === "option2" && <Option2 />}
         {activePage === "option3" && <Option3 />}
         {activePage === "option4" && <Option4 />}
-
+        {activePage === "profileSettings" && <ProfileSettings />}
         {/* Chat Panel */}
         <ChatPanel
           messages={messagesByConv}

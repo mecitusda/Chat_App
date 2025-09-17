@@ -16,9 +16,15 @@ import {
   applyMessageAck,
 } from "../slices/messageSlice";
 import { useTyping } from "../hooks/useTyping";
-import { resetUnread } from "../slices/conversationSlice";
+import {
+  resetUnread,
+  selectMyLastReadId,
+  updatedLastReadId,
+} from "../slices/conversationSlice";
 import { setAtBottom } from "../slices/uiSlice";
 import { upsertFiles } from "../slices/fileSlice";
+import ProfileDrawer from "../components/ProfileDrawer";
+import { useMediaUrl } from "../hooks/useMediaUrl";
 /* ------ Mesaj durum ikonu (aggregate) ------ */
 function getStatusIconByStatus(status) {
   switch (status) {
@@ -123,12 +129,24 @@ function collectUnseen(convMessages, meId) {
     .filter((m) => {
       const readBy = Array.isArray(m.readBy) ? m.readBy : [];
       const meRead = readBy.some(
-        (x) => String(x.user?._id || x.user) === String(meId)
+        (x) => String(x?.user?._id ?? x?.user) === String(meId)
       );
       return !meRead;
     })
     .map((m) => m._id)
     .filter(Boolean);
+}
+
+function getHeaderAvatarKey(conversation, selfId) {
+  if (!conversation) return undefined;
+  if (conversation.type === "private") {
+    const meFirst = conversation?.members?.[0]?.user?._id === selfId;
+    const other = meFirst
+      ? conversation?.members?.[1]?.user
+      : conversation?.members?.[0]?.user;
+    return other?.avatar; // media_key
+  }
+  return conversation?.avatar; // group media_key
 }
 
 const ChatPanel = ({
@@ -140,6 +158,7 @@ const ChatPanel = ({
   fetchingNew,
   isOnline,
 }) => {
+  //console.log("messages: ", messages);
   const convId = activeConversation?._id;
   const dispatch = useDispatch();
 
@@ -159,9 +178,11 @@ const ChatPanel = ({
   const touchStartYRef = useRef(0);
   const hasTriggeredPullRef = useRef(false);
 
-  const convMessages = (convId && messages?.[convId]) || [];
+  const convMessages = useSelector(
+    (s) => s.messages?.byConversation[activeConversation?._id] || []
+  );
   const canLoadOlder = !!isOnline && !!hasMoreOlder;
-
+  //console.log("mesajlar:", convMessages);
   /* read throttle/guard */
   const sentReadRef = useRef(new Set());
   const readDebounceRef = useRef(null);
@@ -179,7 +200,18 @@ const ChatPanel = ({
   //Skip
   const endRef = useRef(null);
   const wasAtBottomRef = useRef(true);
-  /* Odayı izle */
+  const isPrependingRef = useRef(false);
+
+  //Profile
+  const [isProfileOpen, setProfileOpen] = useState(false);
+
+  //Last read
+  const myLastReadId = useSelector((s) =>
+    selectMyLastReadId(s, activeConversation?._id, userId)
+  );
+  const isFromMe = (m) => {
+    return String(m?.sender || m?.sender?._id) === String(userId);
+  };
   useEffect(() => {
     if (!socket || !convId) return;
     socket.emit("watch-conversation", { conversationId: convId });
@@ -222,11 +254,11 @@ const ChatPanel = ({
 
     prevScrollHeightRef.current = el.scrollHeight;
     prevScrollTopRef.current = el.scrollTop;
-
+    isPrependingRef.current = true;
     socket?.emit("messages-before", {
       conversationId: convId,
       before: firstId,
-      limit: 2,
+      limit: 20,
     });
   }, [
     convId,
@@ -253,13 +285,15 @@ const ChatPanel = ({
     }, 300);
 
     ids.forEach((id) => sentReadRef.current.add(String(id)));
+    if (ids.length !== 0) {
+      socket.emit("message:read", {
+        messageIds: ids,
+        conversationId: convId,
+        userId,
+      });
 
-    socket.emit("message:read", {
-      messageIds: ids,
-      conversationId: convId,
-      userId,
-    });
-    dispatch(resetUnread(activeConversation?._id));
+      dispatch(resetUnread(activeConversation?._id));
+    }
   }, [socket, convId, convMessages, userId, dispatch, activeConversation?._id]);
 
   /* status-update listener (delivered/read yansıt) */
@@ -275,7 +309,6 @@ const ChatPanel = ({
     }) => {
       const ids = messageId ? [messageId] : messageIds || [];
       if (!ids.length) return;
-
       dispatch(
         applyMessageAck({
           conversationId: conversationId || convId,
@@ -285,6 +318,17 @@ const ChatPanel = ({
           at,
         })
       );
+
+      const lastId = ids[ids.length - 1];
+      if (action === "read" && by) {
+        dispatch(
+          updatedLastReadId({
+            conversationId: activeConversation?._id,
+            lastReadMessageId: lastId,
+            meId: by,
+          })
+        );
+      }
     };
     socket.on("message:status-update", handler);
     return () => socket.off("message:status-update", handler);
@@ -307,6 +351,7 @@ const ChatPanel = ({
     }
     setLoadingOlder(false);
     pendingBeforeIdRef.current = null;
+    isPrependingRef.current = false;
   }, [convMessages, loadingOlder]);
 
   /* Scroll: hem eski mesaj yükle, hem alttaysa okundu yap + atBottom'ı Redux'a yaz */
@@ -375,9 +420,14 @@ const ChatPanel = ({
 
   /* Yeni mesaj geldiğinde: alttaysa en alta yapışık kal + Redux'a atBottom yaz + okundu gönder */
   useEffect(() => {
+    //console.log("yeni mesaj geldi en alttayım.");
     const el = listRef.current;
     if (!el || convMessages.length === 0) return;
 
+    if (isPrependingRef.current) {
+      updateAtBottom(); // sadece state/ref güncelle
+      return;
+    }
     const last = convMessages[convMessages.length - 1];
     const iSent = String(last?.sender?._id || last?.sender) === String(userId);
 
@@ -437,7 +487,7 @@ const ChatPanel = ({
     return (
       names.join(", ") + (more > 0 ? ` ve ${more} kişi ` : " ") + "yazıyor…"
     );
-  }, [activeTypers, userId, activeConversation]);
+  }, [activeTypers]);
 
   /* ------ Mesaj içinde medya render ------ */
   const renderMessageMedia = (m) => {
@@ -465,9 +515,8 @@ const ChatPanel = ({
             src={mediaUrl}
             alt="media"
             className="message__media"
-            onLoad={() => {
-              stickIfBottom;
-            }}
+            onLoad={stickIfBottom}
+            onLoadedMetadata={stickIfBottom}
           />
         </span>
       );
@@ -595,33 +644,67 @@ const ChatPanel = ({
     }, 200);
   }, [markAsRead, convId, dispatch]);
 
+  useEffect(() => setProfileOpen(false), [activeConversation?._id]);
+
+  const unreadDividerIndex = React.useMemo(() => {
+    if (fetchingNew) return null;
+
+    const unseen = collectUnseen(convMessages, userId);
+    if (!unseen.length) return null;
+    const firstUnseenIndex = convMessages.findIndex((m) => m._id === unseen[0]);
+    return firstUnseenIndex >= 0 ? firstUnseenIndex : null;
+  }, [activeConversation?._id, fetchingNew]);
+
+  const headerAvatarKey = React.useMemo(
+    () => getHeaderAvatarKey(activeConversation, userId),
+    [activeConversation, userId]
+  );
+
+  // 2) hook’u TEK yerde çağır
+  const headerAvatarUrl = useMediaUrl(headerAvatarKey);
+  /* Odayı izle */
   return (
     <div className="chat__panel">
-      <ChatHeader
-        name={
-          activeConversation?.type === "private"
-            ? activeConversation?.members[0].user._id === userId
-              ? activeConversation?.members[1].user.username
-              : activeConversation?.members[0].user.username
-            : activeConversation?.name
-        }
-        activeConversation={activeConversation}
-        avatar={
-          activeConversation?.type === "private"
-            ? activeConversation.members[0]._id === userId
-              ? activeConversation?.members[1].user.avatar
-                ? activeConversation?.members[1].user.avatar
-                : "https://media.newyorker.com/photos/59095bb86552fa0be682d9d0/master/w_2560%2Cc_limit/Monkey-Selfie.jpg"
-              : activeConversation?.members[0].user.avatar
-              ? activeConversation?.members[0].user.avatar
-              : "https://media.newyorker.com/photos/59095bb86552fa0be682d9d0/master/w_2560%2Cc_limit/Monkey-Selfie.jpg"
-            : activeConversation?.avatar
-            ? activeConversation?.avatar
-            : "https://cdn-icons-png.flaticon.com/512/8801/8801434.png"
-        }
-        userId={userId}
-      />
+      {activeConversation && (
+        <>
+          <ChatHeader
+            name={
+              activeConversation?.type === "private"
+                ? activeConversation?.members[0].user._id === userId
+                  ? activeConversation?.members[1].user.username
+                  : activeConversation?.members[0].user.username
+                : activeConversation?.name
+            }
+            onOpenProfile={() => setProfileOpen(true)}
+            activeConversation={activeConversation}
+            avatar={
+              headerAvatarUrl || "https://avatar.iran.liara.run/public/49"
+            }
+            userId={userId}
+          />
 
+          <ProfileDrawer
+            isOpen={isProfileOpen}
+            onClose={() => setProfileOpen(false)}
+            conversation={activeConversation}
+            meId={userId}
+            mediaThumbs={galleryItems
+              .filter((i) => i.type === "image")
+              .map((i) => i.src)
+              .slice(0, 9)}
+            allMedia={galleryItems} // [{src,type,alt}]
+            onOpenLightbox={(start) => {
+              // PANEL KAPANMADAN GLOBAL LB
+              setLightboxIndex(start);
+              setLightboxOpen(true);
+            }}
+            onBlock={() => console.log("Engelle")}
+            onReport={() => console.log("Şikayet et")}
+            onDeleteChat={() => console.log("Sohbeti sil")}
+            avatar={headerAvatarUrl}
+          />
+        </>
+      )}
       <div
         className={`chat__messages ${!hasMoreOlder ? "no-more" : ""}`}
         ref={listRef}
@@ -631,59 +714,75 @@ const ChatPanel = ({
         onTouchMove={canLoadOlder ? handleTouchMove : undefined}
         style={{ overflowY: "auto", position: "relative" }}
       >
-        {!isOnline ? (
-          <div className="older-chip older-chip--disabled" aria-disabled="true">
-            Çevrimdışı — eski mesajlar yüklenemiyor
-          </div>
-        ) : hasMoreOlder ? (
-          <div className="older-chip btn-dark" onClick={loadOlder}>
-            Daha eski mesajları göster
-          </div>
-        ) : (
-          <div className="older-chip older-chip--end">Tüm geçmiş yüklendi</div>
+        {activeConversation && (
+          <>
+            {!isOnline ? (
+              <div
+                className="older-chip older-chip--disabled"
+                aria-disabled="true"
+              >
+                Çevrimdışı — eski mesajlar yüklenemiyor
+              </div>
+            ) : hasMoreOlder ? (
+              <div className="older-chip btn-dark" onClick={loadOlder}>
+                Daha eski mesajları göster
+              </div>
+            ) : (
+              <div className="older-chip older-chip--end">
+                Tüm geçmiş yüklendi
+              </div>
+            )}
+            {loadingOlder && (
+              <div className="loading--top">Daha eski mesajlar yükleniyor…</div>
+            )}
+          </>
         )}
-
-        {loadingOlder && (
-          <div className="loading--top">Daha eski mesajlar yükleniyor…</div>
-        )}
-
         {convMessages.map((msg, index) => {
           const isMe = (msg?.sender?._id || msg?.sender) === userId;
           const hasMedia = msg.type !== "text" && msg.media_key;
-
+          //console.log(unreadDividerIndex);
           return (
-            <div
-              key={index}
-              className={`message message--${isMe ? "outgoing" : "incoming"}`}
-            >
-              {hasMedia && renderMessageMedia(msg)}
-              <div className="message__content">
-                {msg.text && <span className="message__text">{msg.text}</span>}
-                <div className="message__meta">
-                  <span className="message__time">
-                    {formatToHour(msg.createdAt)}
-                  </span>
-                  {isMe && (
-                    <span className="message__status">
-                      {getStatusIconByStatus(
-                        computeEffectiveStatus(msg, activeConversation, userId)
-                      )}
-                    </span>
+            <React.Fragment key={msg._id || index}>
+              {unreadDividerIndex === index && (
+                <div className="unread-divider">Yeni mesajlar</div>
+              )}
+              <div
+                className={`message message--${isMe ? "outgoing" : "incoming"}`}
+              >
+                {hasMedia && renderMessageMedia(msg)}
+                <div className="message__content">
+                  {msg.text && (
+                    <span className="message__text">{msg.text}</span>
                   )}
+                  <div className="message__meta">
+                    <span className="message__time">
+                      {formatToHour(msg.createdAt)}
+                    </span>
+                    {isMe && (
+                      <span className="message__status">
+                        {getStatusIconByStatus(
+                          computeEffectiveStatus(
+                            msg,
+                            activeConversation,
+                            userId
+                          )
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </React.Fragment>
           );
         })}
-        <div ref={endRef} />
 
+        <div ref={endRef} />
         {!isAtBottom && unread > 0 && (
           <div className="chat__scrollToBottom">
             <button onClick={scrollToBottom}>{unread} yeni mesaj ↓</button>
           </div>
         )}
       </div>
-
       <ChatInput
         onOptimisticMessage={(tempMsg) => {
           dispatch(
@@ -727,7 +826,6 @@ const ChatPanel = ({
         conversationId={activeConversation?._id}
         userId={userId}
       />
-
       {isLightboxOpen && galleryItems.length > 0 && (
         <MediaLightbox
           items={galleryItems}

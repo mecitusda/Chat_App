@@ -41,7 +41,7 @@ router.get('/messages/:conversationId', async (req, res) => {
     const { conversationId } = req.params;
     let { limit, after, before, populate , userId } = req.query;
     const LIM = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-
+    console.log("limit: ",limit)
     // 1) Query kur (cursor objesini güvenli kur)
     const query = { conversation: conversationId };
     const idCond = {};
@@ -100,6 +100,8 @@ router.get('/messages/:conversationId', async (req, res) => {
   }
 );
     }
+
+    console.log("yeni mesaj: ",docs)
 
     res.json({
       success: true,
@@ -192,7 +194,7 @@ router.get("/:userId", async (req, res) => {
     })
       .sort({ updated_at: -1 })
       .populate({ path: "last_message.sender", select: "username avatar" })
-      .populate("members.user", "username avatar status")
+      .populate("members.user", "username avatar status about")
       .populate("last_message.message", "")
       .lean(); // ← sayım yaparken daha rahat
 
@@ -273,7 +275,7 @@ router.post("/message", async (req, res) => {
       },
       { new: true }
     ).sort({ updated_at: -1 }).populate({ path: "last_message.sender", select: "username" })
-      .populate("members.user", "username avatar status")
+      .populate("members.user", "username avatar status about")
       .populate("last_message.message","");
 
       
@@ -384,105 +386,6 @@ router.patch("/message/mark-delivered", async (req, res) => {
 
 
 
-// router.patch("/message/:id/status", async (req, res) => {
-//   try {
-//     const { status, by } = req.body;
-//     const { id } = req.params;
-
-//     if (!["delivered", "read"].includes(status)) {
-//       return res.status(400).json({ error: "Geçersiz status" });
-//     }
-
-//     const msg = await Message.findById(id);
-//     if (!msg) return res.status(404).json({ error: "Mesaj bulunamadı" });
-
-//     if (!canUpgrade(msg.status || "sent", status)) {
-//       return res.json({ success: true, message: msg }); // no-op
-//     }
-
-//     msg.status = status;
-//     await msg.save();
-
-//     // Konuşmanın son mesajı ise last_message.status’i de yukarı çek
-//     if (String(msg._id) === String(msg.conversation?.last_message?.message)) {
-//       await Conversation.updateOne(
-//         { _id: msg.conversation },
-//         { $set: { "last_message.status": status } }
-//       );
-//     }
-
-//     return res.json({ success: true, message: msg, by });
-//   } catch (e) {
-//     console.error("PATCH /message/:id/status", e);
-//     res.status(500).json({ error: "Sunucu hatası" });
-//   }
-// });
-
-// router.patch("/message/status", async (req, res) => {
-//   console.log("333")
-//   try {
-//     const { ids = [], action, by } = req.body;
-//     if (!Array.isArray(ids) || ids.length === 0) {
-//       return res.status(400).json({ error: "ids boş olamaz" });
-//     }
-//     if (!by) return res.status(400).json({ error: "`by` (userId) gerekli" });
-//     if (!["delivered", "read"].includes(action)) {
-//       return res.status(400).json({ error: "action delivered|read olmalı" });
-//     }
-
-//     const now = new Date();
-
-//     // Kendi gönderdiğin mesajlar için delivered/read yazma
-//     const baseFilter = {
-//       _id: { $in: ids },
-//       sender: { $ne: by },
-//     };
-
-//     if (action === "delivered") {
-//       const result = await Message.updateMany(
-//         {
-//           ...baseFilter,
-//           "deliveredTo.user": { $ne: by },
-//         },
-//         {
-//           $addToSet: { deliveredTo: { user: by, at: now } },
-//         }
-//       );
-//       return res.json({
-//         success: true,
-//         modified: result.modifiedCount ?? result.nModified ?? 0,
-//         action,
-//         by,
-//         modifiedIds: ids, // pratik: client'a geri verebiliriz
-//       });
-//     }
-
-//     // action === "read"
-//     const result = await Message.updateMany(
-//       {
-//         ...baseFilter,
-//         "readBy.user": { $ne: by },
-//       },
-//       {
-//         $addToSet: { readBy: { user: by, at: now } },
-//         // read gelmişse delivered da garanti olsun
-//         $setOnInsert: {},
-//         $addToSet: { deliveredTo: { user: by, at: now } },
-//       }
-//     );
-
-//     return res.json({
-//       success: true,
-//       modified: result.modifiedCount ?? result.nModified ?? 0,
-//       action,
-//       by,
-//       modifiedIds: ids,
-//     });
-//   } catch (e) {
-//     console.error("PATCH /message/status", e);
-//     res.status(500).json({ error: "Sunucu hatası" });
-//   }
-// });
 
 
 /**
@@ -559,7 +462,7 @@ router.patch("/message/status", async (req, res) => {
       return res.json({ success: true, action, by, modified });
     }
   } catch (e) {
-    console.error("PATCH /conversation/message/status", e);
+    console.error("PATCH /conversation/message/status", e.message);
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
@@ -570,7 +473,7 @@ router.patch('/user/last_seen/:id', async (req,res) => {
     const setLast_Seen = await User.findByIdAndUpdate({_id:id},{$set:{last_seen:Date.now()}})
     res.json({success:true,last_seen:setLast_Seen.last_seen})
   }catch(err){
-    console.error("PATCH /user/last_seen/:id", e);
+    console.error("PATCH /user/last_seen/:id", err);
     res.status(500).json({ error: "Sunucu hatası" });
   }
 })

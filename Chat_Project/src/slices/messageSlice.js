@@ -51,24 +51,42 @@ const messageSlice = createSlice({
 
     // ✅ ACK geldiğinde temp mesajı gerçek mesajla değiştir
     replaceTempMessage(state, action) {
+      // const { conversationId, tempId, message } = action.payload;
+      // const list = state.byConversation[conversationId] || [];
+      // const idx = list.findIndex((m) => m._id === tempId);
+      // if (idx !== -1) {
+      //   //console.log("1,",tempId,message,list[idx]._id)
+      //   list[idx] = message; // kalem gibi değiştir
+      //   //console.log(list[idx])
+      // } else {
+      //   // temp bulunamadıysa güvenlik için ekle
+      //   list.push(message);
+      //   list.sort((a, b) => {
+      //     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      //     const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      //     if (ta && tb) return ta - tb;
+      //     // fallback: _id
+      //     return a._id > b._id ? 1 : -1;
+      //   });
+      // }
+
+
       const { conversationId, tempId, message } = action.payload;
-      const list = state.byConversation[conversationId] || [];
-      const idx = list.findIndex((m) => m._id === tempId);
-      if (idx !== -1) {
-        //console.log("1,",tempId,message,list[idx]._id)
-        list[idx] = message; // kalem gibi değiştir
-        //console.log(list[idx])
-      } else {
-        // temp bulunamadıysa güvenlik için ekle
-        list.push(message);
-        list.sort((a, b) => {
-          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          if (ta && tb) return ta - tb;
-          // fallback: _id
-          return a._id > b._id ? 1 : -1;
-        });
-      }
+      const arr = state.byConversation[conversationId] || [];
+    
+      // 1) temp'i at
+      let next = arr.filter(m => String(m._id) !== String(tempId));
+    
+      // 2) aynı gerçek id zaten varsa onu da at
+      next = next.filter(m => String(m._id) !== String(message._id));
+    
+      // 3) yeni mesajı ekle
+      next.push(message);
+    
+      // (opsiyonel) tarihe göre sırala
+      next.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+    
+      state.byConversation[conversationId] = next;
     },
 
     // ✅ Sadece statü güncelle (sending → failed vs.)

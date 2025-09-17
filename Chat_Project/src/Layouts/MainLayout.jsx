@@ -5,7 +5,7 @@ import Footer from "../components/Footer";
 import { resetConversation } from "../slices/conversationSlice.js";
 import { resetFile } from "../slices/fileSlice.js";
 import { resetMessages } from "../slices/messageSlice.js";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 // import { ThemeContext } from "../contexts/ThemeContext";
 const MainLayout = ({}) => {
   const SOCKET_URL = import.meta.env.VITE_BACKEND_SOCKET_URL;
@@ -16,7 +16,10 @@ const MainLayout = ({}) => {
   //   const { theme } = useContext(ThemeContext);
   //   const color = theme === "dark" ? "bg-dark text-white" : "bg-light text-dark";
   const [activeConversation, setActiveConversation] = useState(null);
-
+  // console.log(
+  //   "maindeki chat: ",
+  //   useSelector((s) => s.conversations.list || [])
+  // );
   return (
     <>
       {/* <Header /> */}

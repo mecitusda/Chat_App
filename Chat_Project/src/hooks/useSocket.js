@@ -7,6 +7,8 @@ import {
 resetUnread,
 setUnread
 } from "../slices/conversationSlice";
+import { upsertProfileAvatars } from "../utils/upsertProfileAvatars";
+import {store} from "../store/index"
 /**
  * status: "connecting" | "connected" | "reconnecting" | "offline"
  * addOrUpdateConversations: slice action creator (payload: conversations array)
@@ -25,8 +27,8 @@ export const getPeerIdsFromConversation = (c, meId) => {
     .filter(uid => uid && uid !== my);
 };
 
-export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations) {
-  const dispatch = useDispatch();
+export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,dispatch) {
+  //const dispatch = useDispatch();
   const [status, setStatus] = useState("connecting");
 
   const socket = useMemo(() => {
@@ -50,6 +52,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
       if (Array.isArray(list) && list.length >= 0) {
         dispatch(addOrUpdateConversations(list));
       }
+      console.log("sockettan güncellendi.")
       const allPeers = new Set();
   for (const conv of payload.conversations) {
     if(conv.unread > 0){
@@ -67,8 +70,9 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
       dispatch(setPresenceBulk(map));
     });
   }
+    upsertProfileAvatars(list, userId, dispatch,store.getState);
 
-      
+ 
     };
     const last_seen = localStorage.getItem("last_seen");
     const onConnect = () => {
@@ -99,7 +103,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
       socket.io.off("reconnect_failed", onReconnectFailed);
       socket.close();
     };
-  }, [socket, userId, dispatch, addOrUpdateConversations]);
+  }, [socket, userId, dispatch, addOrUpdateConversations,upsertProfileAvatars]);
 
   useEffect(() => {
     if (!socket || !userId) return;

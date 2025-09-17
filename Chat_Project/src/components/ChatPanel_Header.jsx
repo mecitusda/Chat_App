@@ -11,7 +11,13 @@ function formatLastSeen(ts) {
   })}`;
 }
 
-const ChatPanel_Header = ({ activeConversation, userId, name, avatar }) => {
+const ChatPanel_Header = ({
+  activeConversation,
+  userId,
+  name,
+  avatar,
+  onOpenProfile,
+}) => {
   // --- PRIVATE: karşı tarafın id'si
   const peerId =
     activeConversation?.type === "private"
@@ -56,7 +62,14 @@ const ChatPanel_Header = ({ activeConversation, userId, name, avatar }) => {
   return (
     <div className="chat__header">
       <img src={avatar} alt={name} className="chat__header-avatar" />
-      <div className="chat__header-info">
+      <div
+        className="chat__header-info"
+        onClick={onOpenProfile}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onOpenProfile?.()}
+        style={{ cursor: "pointer" }}
+      >
         <span className="chat__header-name">{name}</span>
         <span className="chat__header-status">{statusText}</span>
       </div>

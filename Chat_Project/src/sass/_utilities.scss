@@ -3,9 +3,9 @@
 //containers
 
 .container{
-    max-width: variables.$max-width;
+    // max-width: variables.$max-width;
     margin:auto;
-    padding: 0 
+    padding: 0
 }
 
 //buttons
@@ -614,9 +614,9 @@ input[class^='btn-']:hover
 @media (max-width: 576px) {
   
   .container{
-      max-width: 960px !important;
-      height: 95vh !important;
-      width: 99% !important;
+     
+      height: 100vh !important;
+      width: 100% !important;
     }
 
    .message__file {
@@ -700,9 +700,9 @@ input[class^='btn-']:hover
 @media (min-width: 577px) and (max-width: 992px) {
   
   .container{
-      max-width: 960px !important;
-      height: 95vh !important;
-      width: 95% !important;
+      //max-width: 960px !important;
+      height: 100vh !important;//95
+      width: 100% !important;//95
     }
 
    .message__file {

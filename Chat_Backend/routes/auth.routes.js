@@ -34,7 +34,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
 
@@ -42,10 +42,40 @@ router.post("/login", async (req, res) => {
     if (!match) return res.status(401).json({ error: "Şifre hatalı" });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
     res.json({ success: true, token, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.patch("/profile", /*auth,*/ async (req, res) => {
+  try {
+    const { user_id, username, about, avatar } = req.body;
+    console.log({ user_id, username, about, avatar })
+    if (!user_id) return res.status(400).json({ success: false, message: "user_id gerekli" });
+
+    const payload = {};
+    if (typeof username === "string") payload.username = username.trim();
+    if (typeof about === "string") payload.about = about.trim();
+    if (typeof avatar === "string") payload.avatar = avatar;
+
+    if (!Object.keys(payload).length) {
+      return res.status(400).json({ success: false, message: "Güncellenecek alan yok" });
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      user_id,
+      { $set: payload, $currentDate: { updated_at: true } },
+      { new: true, projection: { password_hash: 0, __v: 0 } }
+    );
+
+    if (!updated) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+
+    res.json({ success: true, user: updated });
+  } catch (err) {
+    console.error("profile patch error:", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
 

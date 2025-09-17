@@ -51,9 +51,9 @@ router.get("/presigned-url/profile", async (req, res) => {
       ContentType: fileType,
     });
     const uploadURL = await getSignedUrl(s3, command, { expiresIn: 60 }); // 60 saniye geçerli
-    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    
 
-    return res.json({ uploadURL, fileUrl });
+    return res.json({ uploadURL, media_key:key });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "URL alınamadı" });
@@ -124,9 +124,51 @@ router.get("/presigned-url/file", async (req, res) => {//bu routera yetki koyuca
 
 // POST 
 
+router.post("/presigned-url/avatars", async (req, res) => {
+  const { avatars } = req.body; 
+  // avatars = [{ media_key, type, ownerUserId, sourceConvId }, ...]
+  console.log(avatars)
+  if (!Array.isArray(avatars) || avatars.length === 0) {
+    return res.status(400).json({ error: "avatars boş olamaz" });
+  }
+
+  try {
+    const urls = await Promise.all(
+      avatars.map(async (avatar) => {
+        const command = new GetObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: avatar.media_key,
+        });
+        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+        return {
+          ...avatar, // media_key, type, ownerUserId, sourceConvId
+          media_url: url, // yeni eklenen alan
+        };
+      })
+    );
+
+    // conversationId'ye göre grupla
+    const grouped = {};
+    urls.forEach((item) => {
+      const convId = item.sourceConvId || item.ownerConvId;
+      if (!convId) return; // safety
+      if (!grouped[convId]) grouped[convId] = [];
+      grouped[convId].push(item);
+    });
+
+    return res.json(grouped);
+  } catch (error) {
+    console.error("Avatar presigned hatası:", error);
+    return res.status(500).json({ error: "Avatar URL'leri alınamadı" });
+  }
+});
+
+
+
+
 router.post("/presigned-url/files", async (req, res) => {//bu routera yetki koyucazki herkes alamasın signature.hepsine koyulcak ama bu öncelikli
   const {mediaKeys} = req.body;
-  console.log(mediaKeys)
   try{
     const urls = await Promise.all(
   mediaKeys.map(async (media_key) => {

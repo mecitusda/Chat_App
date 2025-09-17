@@ -112,7 +112,16 @@ export default function ChatInput({
     });
     return { mediaKey, mime: file.type, size: file.size };
   }
+  const handleKeyDown = (e) => {
+    // IME (örn. Türkçe öngörü) sırasında tetikleme
+    if (e.isComposing || e.keyCode === 229) return;
 
+    // Enter = gönder, Shift+Enter = satır başı
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend(); // <-- burada mevcut gönderme fonksiyonunu çağır
+    }
+  };
   async function handleSend() {
     if (!isOnline || !conversationId || !userId) return;
     if (!text.trim() && !file) return;
@@ -215,8 +224,9 @@ export default function ChatInput({
           if (e.target.value.trim()) notifyTyping();
           else stopTyping();
         }}
+        onKeyDown={handleKeyDown}
         onBlur={stopTyping}
-        disabled={!isOnline || sending}
+        disabled={!isOnline}
       />
 
       <button onClick={handleSend} disabled={!isOnline || sending}>
