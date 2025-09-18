@@ -46,10 +46,17 @@ import {
 } from "../slices/paginationSlice";
 import { useOutletContext } from "react-router";
 import { useUser } from "../contextAPI/UserContext";
+import NotificationBanner from "../components/NotificationBanner";
 
 const Chat = () => {
-  const { activeConversation, setActiveConversation, SOCKET_URL } =
-    useOutletContext();
+  const {
+    activeConversation,
+    setActiveConversation,
+    SOCKET_URL,
+    setResetEnabled,
+    handleClick,
+    resetEnabled,
+  } = useOutletContext();
   const { user } = useUser();
 
   const userId = user?._id;
@@ -70,6 +77,9 @@ const Chat = () => {
 
   // Yeni mesaj (after) fetch animasyonu için
   const [fetchingNew, setFetchingNew] = useState(false);
+
+  //Bildirim
+  const [showBanner, setShowBanner] = useState(false);
 
   // Socket
   const { socket, status, isConnected } = useSocket(
@@ -372,6 +382,7 @@ const Chat = () => {
   return (
     <>
       <title>Chat</title>
+      {showBanner && <NotificationBanner show={showBanner} />}
       <div className="chat-container container">
         {/* Chat Options */}
         <div className="chat__options">
@@ -450,6 +461,17 @@ const Chat = () => {
           isOnline={isConnected}
         />
       </div>
+      <button
+        className="reset"
+        onClick={() => {
+          handleClick();
+          setShowBanner(true);
+          setResetEnabled(false);
+        }}
+        disabled={!resetEnabled}
+      >
+        {resetEnabled ? "DO NOT PRESS" : "YETER DAHA BASMA SAYFA YENİLE"}
+      </button>
     </>
   );
 };

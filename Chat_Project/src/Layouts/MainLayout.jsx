@@ -16,6 +16,16 @@ const MainLayout = ({}) => {
   //   const { theme } = useContext(ThemeContext);
   //   const color = theme === "dark" ? "bg-dark text-white" : "bg-light text-dark";
   const [activeConversation, setActiveConversation] = useState(null);
+  const [resetEnabled, setResetEnabled] = useState(true);
+
+  const handleClick = () => {
+    if (resetEnabled) {
+      dispatch(resetConversation());
+      dispatch(resetMessages());
+      dispatch(resetFile());
+    }
+  };
+
   // console.log(
   //   "maindeki chat: ",
   //   useSelector((s) => s.conversations.list || [])
@@ -25,7 +35,14 @@ const MainLayout = ({}) => {
       {/* <Header /> */}
       <main>
         <Outlet
-          context={{ activeConversation, setActiveConversation, SOCKET_URL }}
+          context={{
+            activeConversation,
+            setActiveConversation,
+            SOCKET_URL,
+            setResetEnabled,
+            handleClick,
+            resetEnabled,
+          }}
         />
       </main>
       {/* <Footer /> */}
