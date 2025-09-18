@@ -10,6 +10,7 @@ import { useSocket } from "../hooks/useSocket";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAtBottom } from "../slices/uiSlice";
 import { store } from "../store/index";
+import { upsertProfileAvatars } from "../utils/upsertProfileAvatars";
 // Conversations
 import {
   addOrUpdateConversations,
@@ -62,7 +63,7 @@ const Chat = () => {
   const filesByConv = useSelector((s) => s.files?.byKey || {});
   const uis = useSelector((s) => s.ui.atBottomByConv || []);
   //console.log("chatler: ", conversations);
-  console.log("files: ", filesByConv);
+  //console.log("files: ", filesByConv);
   //console.log("uis: ", uis);
   // UI state
   const [activePage, setActivePage] = useState("chatList");
@@ -111,7 +112,7 @@ const Chat = () => {
           (!f.expiresAt || f.expiresAt <= now)
       )
       .map((f) => f);
-
+    //console.log("avatars: ", avatars);
     if (avatars.length > 0) {
       socket.emit("pre-signature-avatars", {
         mediaKeys: avatars,
@@ -121,9 +122,11 @@ const Chat = () => {
     if (!convId) return;
 
     const files = filesByConv[convId] || [];
+
     const expiredKeys = files
-      .filter((f) => !f.expiresAt || f.expiresAt <= now)
-      .map((f) => f);
+      .filter((f) => !f.type && (f.expiresAt <= now || !f.expiresAt))
+      .map((f) => f.media_key);
+
     if (expiredKeys.length > 0) {
       socket.emit("pre-signature-files", {
         mediaKeys: expiredKeys,
@@ -280,7 +283,7 @@ const Chat = () => {
       socket.off("message:status-update", handleStatusUpdate);
     };
     // aktif konuşma değişirse fallback convId güncel kalsın:
-  }, [socket, dispatch, activeConversation?._id, userId]);
+  }, [socket, dispatch, activeConversation?._id]);
 
   // === Konuşma değişince mesajları getir ===
   useEffect(() => {

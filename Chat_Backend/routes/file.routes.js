@@ -39,7 +39,9 @@ const fType = (data) => {
 
 router.get("/presigned-url/profile", async (req, res) => {
   try {
+    console.log("1")
     const { user_id , fileType } = req.query;
+    console.log({ user_id , fileType })
     if (!user_id || !fileType) {
       return res.status(400).json({ error: "Eksik parametre" });
     }
@@ -62,6 +64,7 @@ router.get("/presigned-url/profile", async (req, res) => {
 
 router.get("/presigned-url/group", async (req, res) => {
   try {
+     console.log("2")
     const { fileType, conversationId } = req.query;
     if (!fileType || !conversationId) {
       return res.status(400).json({ error: "Eksik parametre" });
@@ -84,11 +87,13 @@ router.get("/presigned-url/group", async (req, res) => {
 
 router.get("/presigned-url/message", async (req, res) => {
   try {
+     console.log("3")
     const { conversationId, fileType } = req.query;
     
     if (!conversationId || !fileType) {
       return res.status(400).json({ error: "Eksik parametre" });
     }
+    console.log("buraya girdi.")
     const key = `conversations/${conversationId}/${fType(fileType)}/${generateUniqueFilename()}.${fileType.split("/")[1]}`;
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -107,6 +112,7 @@ router.get("/presigned-url/message", async (req, res) => {
 
 
 router.get("/presigned-url/file", async (req, res) => {//bu routera yetki koyucazki herkes alamasın signature.hepsine koyulcak ama bu öncelikli
+   console.log("4")
   const mediaKey = req.query.mediaKey;
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -126,6 +132,7 @@ router.get("/presigned-url/file", async (req, res) => {//bu routera yetki koyuca
 
 router.post("/presigned-url/avatars", async (req, res) => {
   const { avatars } = req.body; 
+   console.log("5")
   // avatars = [{ media_key, type, ownerUserId, sourceConvId }, ...]
   console.log(avatars)
   if (!Array.isArray(avatars) || avatars.length === 0) {
@@ -168,19 +175,25 @@ router.post("/presigned-url/avatars", async (req, res) => {
 
 
 router.post("/presigned-url/files", async (req, res) => {//bu routera yetki koyucazki herkes alamasın signature.hepsine koyulcak ama bu öncelikli
+   console.log("6")
   const {mediaKeys} = req.body;
   try{
+   
     const urls = await Promise.all(
   mediaKeys.map(async (media_key) => {
+    console.log(media_key)
     const command = new GetObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: media_key,
     });
+  
     const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
     return { media_key, media_url:url };
   })
+
 );
-     
+
   return res.json(urls);
   }catch(error){
     console.error(error);

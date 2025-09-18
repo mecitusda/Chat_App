@@ -242,7 +242,7 @@ io.on("connection", (socket) => {
         conversationId, // client handler’ı kullanıyorsa ekle
         message:"mesaj gönderildi."
       });
-      console.log("güncellenmiş chat: ",data?.chat)
+      // console.log("güncellenmiş chat: ",data?.chat)
       const responsemembers = await axios.get(`${BACKEND_URL}/api/conversation/${conversationId}/members`)
       for (const m of responsemembers.data?.members) {
         io.to(`user:${m}`).emit("chatList:update", 
@@ -292,7 +292,7 @@ io.on("connection", (socket) => {
 
   socket.on("messages-before", async ({ conversationId, before, limit }) => {
   try {
-    console.log("limit: ",limit)
+   
     const url = `${BACKEND_URL}/api/conversation/messages/${conversationId}?before=${before}&limit=${limit || 50}`;
     const {data} = await axios.get(url);
     socket.emit("messageList", {conversationId,...data,message:"before"}); // tek event
@@ -302,13 +302,15 @@ io.on("connection", (socket) => {
   }
 });
 
-  socket.on("pre-signature-file",async ({mediaKeys,conversationId}) => {
+  socket.on("pre-signature-files",async ({mediaKeys,conversationId}) => {
     try{
+      console.log("Sonuç: ",mediaKeys)
       const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/files`,{
        mediaKeys
       })
       
       const urls = response.data;
+      console.log("urller yollanıyor.")
       socket.emit("pre-urls",{urls,conversationId})
     }catch (err) {
       console.error("messages error:", err);
@@ -317,6 +319,7 @@ io.on("connection", (socket) => {
   })
 
   socket.on("pre-signature-avatars",async ({mediaKeys}) => {
+    
     try{
       const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/avatars`,{
        avatars:mediaKeys

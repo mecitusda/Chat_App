@@ -9,6 +9,7 @@ export default function ProfileSettings() {
   const [profileImage, setProfileImage] = useState(
     useMediaUrl(user.avatar) || "https://avatar.iran.liara.run/public/49"
   );
+  console.log(useMediaUrl(user.avatar));
 
   const [newFile, setNewFile] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);

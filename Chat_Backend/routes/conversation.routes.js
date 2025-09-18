@@ -41,7 +41,6 @@ router.get('/messages/:conversationId', async (req, res) => {
     const { conversationId } = req.params;
     let { limit, after, before, populate , userId } = req.query;
     const LIM = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-    console.log("limit: ",limit)
     // 1) Query kur (cursor objesini güvenli kur)
     const query = { conversation: conversationId };
     const idCond = {};
@@ -101,7 +100,6 @@ router.get('/messages/:conversationId', async (req, res) => {
 );
     }
 
-    console.log("yeni mesaj: ",docs)
 
     res.json({
       success: true,
