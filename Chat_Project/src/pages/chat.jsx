@@ -47,6 +47,12 @@ import {
 import { useOutletContext } from "react-router";
 import { useUser } from "../contextAPI/UserContext";
 import NotificationBanner from "../components/NotificationBanner";
+const playNotificationSound = () => {
+  const audio = new Audio("/sounds/new-notification.mp3");
+  audio.play().catch((error) => {
+    console.warn("🔇 Ses çalınamadı:", error);
+  });
+};
 
 const Chat = () => {
   const {
@@ -106,6 +112,12 @@ const Chat = () => {
     return conversations.reduce((total, chat) => {
       return total + (chat.unread || 0); // unread değeri yoksa 0 kabul edilir
     }, 0);
+  }
+
+  if (getTotalUnreadMessages() > 0) {
+    document.title = `(${getTotalUnreadMessages()})Chat`;
+  } else {
+    document.title = "Chat";
   }
 
   const activeAtBottom = useSelector((s) =>
@@ -211,6 +223,11 @@ const Chat = () => {
           userId,
         });
       });
+      if (getTotalUnreadMessages() > 0) {
+        document.title = `(${getTotalUnreadMessages()}) USDachat`;
+      } else {
+        document.title = "USDachat";
+      }
     };
 
     const handlePreUrls = ({ urls, conversationId }) => {
@@ -334,17 +351,17 @@ const Chat = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleChatlistUpdate = (data) => {
-      const convId = data._id;
+    const handleChatlistUpdate = (r) => {
+      const convId = r.data._id;
       const isActiveConv = String(convId) === String(activeConversation?._id);
       const panelAtBottom = isActiveConv ? activeAtBottom : false;
       const isTabVisible = document.visibilityState === "visible";
-      const isFromOther = data?.last_message?.sender?._id !== userId;
+      const isFromOther = r.data?.last_message?.sender?._id !== userId;
       //console.log("chatlistupdate: ,", [data]);
-      dispatch(addOrUpdateConversations([data]));
+      dispatch(addOrUpdateConversations([r.data]));
 
       if (isFromOther && (!isActiveConv || !panelAtBottom || !isTabVisible)) {
-        const increment = data?.last_message.sender._id !== userId ? 1 : 0;
+        const increment = r.data?.last_message.sender._id !== userId ? 1 : 0;
         if (increment === 1) {
           dispatch(
             incrementUnread({
@@ -357,12 +374,17 @@ const Chat = () => {
 
       if (isActiveConv && panelAtBottom && isTabVisible && isFromOther) {
         socket.emit("message:delivered", {
-          messageId: data?.last_message.message._id,
-          conversationId: data._id,
+          messageId: r.data?.last_message.message._id,
+          conversationId: r.data._id,
           userId,
         });
       }
-      upsertProfileAvatars(data, userId, dispatch, store.getState);
+      upsertProfileAvatars(r.data, userId, dispatch, store.getState);
+      console.log("data: ", r);
+      if (r.message === "send-message") {
+        console.log("girdi");
+        playNotificationSound();
+      }
     };
 
     socket.on("chatList:update", handleChatlistUpdate);

@@ -246,7 +246,8 @@ io.on("connection", (socket) => {
       const responsemembers = await axios.get(`${BACKEND_URL}/api/conversation/${conversationId}/members`)
       for (const m of responsemembers.data?.members) {
         io.to(`user:${m}`).emit("chatList:update", 
-          data?.chat
+          {data:data?.chat,
+          message:"send-message"}
         );
       }
 
@@ -301,7 +302,7 @@ io.on("connection", (socket) => {
     socket.emit("error", "Eski mesajlar alınamadı");
   }
 });
-    
+
   socket.on("pre-signature-files",async ({mediaKeys,conversationId}) => {
     try{
       console.log("Sonuç: ",mediaKeys)
