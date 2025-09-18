@@ -205,13 +205,10 @@ const ChatPanel = ({
   //Profile
   const [isProfileOpen, setProfileOpen] = useState(false);
 
-  //Last read
-  const myLastReadId = useSelector((s) =>
-    selectMyLastReadId(s, activeConversation?._id, userId)
-  );
-  const isFromMe = (m) => {
-    return String(m?.sender || m?.sender?._id) === String(userId);
-  };
+  //file Prev
+  const [file, setFile] = useState(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+  console.log("dosya seçili: ", file);
   useEffect(() => {
     if (!socket || !convId) return;
     socket.emit("watch-conversation", { conversationId: convId });
@@ -784,6 +781,44 @@ const ChatPanel = ({
             <button onClick={scrollToBottom}>{unread} yeni mesaj ↓</button>
           </div>
         )}
+        {file && (
+          <div className="file-preview whatsapp-preview">
+            {filePreviewUrl && file.type.startsWith("image/") && (
+              <div className="thumb-container">
+                <img
+                  src={filePreviewUrl}
+                  alt="preview"
+                  className="thumb-image"
+                />
+              </div>
+            )}
+
+            {filePreviewUrl && file.type.startsWith("video/") && (
+              <div className="thumb-container">
+                <video
+                  src={filePreviewUrl}
+                  className="thumb-video"
+                  muted
+                  controls
+                />
+              </div>
+            )}
+
+            {!file.type.startsWith("image/") &&
+              !file.type.startsWith("video/") && (
+                <div className="thumb-container doc-thumb">
+                  <div className="doc-icon">📄</div>
+                  <div className="doc-info">
+                    <span className="doc-name">{file.name}</span>
+                  </div>
+                </div>
+              )}
+
+            <button className="preview-close-btn" onClick={() => setFile(null)}>
+              ×
+            </button>
+          </div>
+        )}
       </div>
       <ChatInput
         onOptimisticMessage={(tempMsg) => {
@@ -827,6 +862,10 @@ const ChatPanel = ({
         socket={socket}
         conversationId={activeConversation?._id}
         userId={userId}
+        file={file}
+        setFile={setFile}
+        filePreviewUrl={filePreviewUrl}
+        setFilePreviewUrl={setFilePreviewUrl}
       />
       {isLightboxOpen && galleryItems.length > 0 && (
         <MediaLightbox

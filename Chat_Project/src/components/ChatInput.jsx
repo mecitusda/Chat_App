@@ -21,9 +21,12 @@ export default function ChatInput({
   onOptimisticMessage,
   onAckReplace,
   onAckStatus,
+  file,
+  filePreviewUrl,
+  setFile,
+  setFilePreviewUrl,
 }) {
   const [text, setText] = useState("");
-  const [file, setFile] = useState(null);
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -90,6 +93,18 @@ export default function ChatInput({
       fileInputRef.current?.click();
     }
   };
+
+  useEffect(() => {
+    if (file) {
+      const preview = URL.createObjectURL(file);
+      setFilePreviewUrl(preview);
+      return () => {
+        URL.revokeObjectURL(preview);
+      };
+    } else {
+      setFilePreviewUrl(null);
+    }
+  }, [file]);
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -212,7 +227,7 @@ export default function ChatInput({
         type="file"
         style={{ display: "none" }}
         onChange={handleFileChange}
-        // accept="image/*,video/*,application/pdf"
+        accept="image/*,video/*"
       />
 
       <input
@@ -232,13 +247,6 @@ export default function ChatInput({
       <button onClick={handleSend} disabled={!isOnline || sending}>
         {sending ? "Gönderiliyor..." : "Gönder"}
       </button>
-
-      {file && (
-        <div className="file-preview">
-          <span>{file.name}</span>
-          <button onClick={() => setFile(null)}>×</button>
-        </div>
-      )}
     </div>
   );
 }
