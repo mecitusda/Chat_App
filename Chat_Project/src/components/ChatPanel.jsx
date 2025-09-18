@@ -701,7 +701,9 @@ const ChatPanel = ({
             onBlock={() => console.log("Engelle")}
             onReport={() => console.log("Şikayet et")}
             onDeleteChat={() => console.log("Sohbeti sil")}
-            avatar={headerAvatarUrl}
+            avatar={
+              headerAvatarUrl || "https://avatar.iran.liara.run/public/49"
+            }
           />
         </>
       )}
