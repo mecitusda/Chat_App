@@ -71,7 +71,7 @@ const Chat = () => {
   const uis = useSelector((s) => s.ui.atBottomByConv || []);
 
   //console.log("chatler: ", conversations);
-  console.log("files: ", filesByConv);
+  //console.log("files: ", filesByConv);
   //console.log("uis: ", uis);
   // UI state
   const [activePage, setActivePage] = useState("chatList");
@@ -115,6 +115,8 @@ const Chat = () => {
   useEffect(() => {
     if (!socket) return;
     const now = Date.now();
+
+    //("avatarlar: ", filesByConv);
     const avatars = Object.values(filesByConv || {})
       .flat()
       .filter(
@@ -123,7 +125,7 @@ const Chat = () => {
           (!f.expiresAt || f.expiresAt <= now)
       )
       .map((f) => f);
-    console.log("avatars: ", avatars);
+    //console.log("avatars: ", avatars);
     if (avatars.length > 0) {
       socket.emit("pre-signature-avatars", {
         mediaKeys: avatars,
@@ -137,7 +139,7 @@ const Chat = () => {
     const expiredKeys = files
       .filter((f) => !f.type && (f.expiresAt <= now || !f.expiresAt))
       .map((f) => f.media_key);
-    console.log("expired: ", expiredKeys);
+    //console.log("expired: ", expiredKeys);
     if (expiredKeys.length > 0) {
       socket.emit("pre-signature-files", {
         mediaKeys: expiredKeys,
@@ -228,7 +230,7 @@ const Chat = () => {
       // backend 3600s veriyorsa küçük bir buffer bırak (5 dk)
       const NOW = Date.now();
       const ONE_HOUR = 60 * 60 * 1000;
-      const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dk
+      const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dakika buffer
       const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
 
       for (const [conversationId, items] of Object.entries(data)) {
@@ -245,12 +247,9 @@ const Chat = () => {
             type: it.type,
             ownerUserId: it.ownerUserId,
             sourceConvId: it.sourceConvId,
-            expiresAt:
-              it.expiresAt && Number.isFinite(it.expiresAt)
-                ? it.expiresAt
-                : DEFAULT_EXPIRES_AT,
+            expiresAt: DEFAULT_EXPIRES_AT,
           }));
-        console.log("files:", files);
+
         if (files.length > 0) {
           dispatch(upsertFiles({ conversationId, files }));
         }

@@ -178,7 +178,7 @@ router.post("/presigned-url/files", async (req, res) => {//bu routera yetki koyu
    console.log("6")
   const {mediaKeys} = req.body;
   try{
-   
+    console.log("mediaKeys: ",mediaKeys)
     const urls = await Promise.all(
   mediaKeys.map(async (media_key) => {
     console.log(media_key)

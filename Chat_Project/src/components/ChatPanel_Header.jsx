@@ -61,7 +61,13 @@ const ChatPanel_Header = ({
 
   return (
     <div className="chat__header">
-      <img src={avatar} alt={name} className="chat__header-avatar" />
+      <img
+        src={avatar}
+        alt={name}
+        className="chat__header-avatar"
+        onClick={onOpenProfile}
+        style={{ cursor: "pointer" }}
+      />
       <div
         className="chat__header-info"
         onClick={onOpenProfile}
