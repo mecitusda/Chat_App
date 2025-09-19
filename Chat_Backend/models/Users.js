@@ -10,7 +10,9 @@ const UserSchema = new mongoose.Schema({
   last_seen: { type: Date, default: Date.now },
   settings: {
     theme: { type: String, enum: ["light", "dark"], default: "light" },
-    notifications: { type: Boolean, default: true }
+    notifications: { type: Boolean, default: true },
+    chatBgImage: {type: String, default: null },
+    chatBgColor : {type: String, default: "#1C1C1C"  },
   }
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
 

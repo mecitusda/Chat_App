@@ -52,7 +52,6 @@ router.post("/login", async (req, res) => {
 router.patch("/profile", /*auth,*/ async (req, res) => {
   try {
     const { user_id, username, about, avatar } = req.body;
-    console.log({ user_id, username, about, avatar })
     if (!user_id) return res.status(400).json({ success: false, message: "user_id gerekli" });
 
     const payload = {};
@@ -78,5 +77,35 @@ router.patch("/profile", /*auth,*/ async (req, res) => {
     res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
+
+router.put("/settings",async (req,res) => {
+  const {theme, notifications, chatBgImage, chatBgColor, userId} = req.body;
+  try{
+    console.log("image:",chatBgImage)
+    const user = await User.findByIdAndUpdate(userId,{
+     $set: {
+      "settings.chatBgImage": chatBgImage,
+      "settings.chatBgColor": chatBgColor,
+      "settings.notifications":notifications,
+      "settings.theme":theme
+    }
+  },{new:true});
+  
+  if(!user){
+    return res.json({error:"Ayarlar güncellenemedi."});
+  }
+  console.log("döndü:",user)
+
+  res.json({
+    success:true,
+    user:{_id: user._id , settings: user.settings}
+  })
+
+  }catch(err){
+    console.log("/settings API Error!")
+    res.json({error:err.message})
+  }
+
+})
 
 export default router;

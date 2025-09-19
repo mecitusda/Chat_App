@@ -47,6 +47,7 @@ import {
 import { useOutletContext } from "react-router";
 import { useUser } from "../contextAPI/UserContext";
 import NotificationBanner from "../components/NotificationBanner";
+import SettingsPanel from "../components/SettingPanel";
 const playNotificationSound = () => {
   const audio = new Audio("/sounds/new-notification.mp3");
   audio.play().catch((error) => {
@@ -63,7 +64,7 @@ const Chat = () => {
     handleClick,
     resetEnabled,
   } = useOutletContext();
-  const { user } = useUser();
+  const { user, setUser } = useUser();
 
   const userId = user?._id;
   //console.log("user: ", user);
@@ -144,6 +145,13 @@ const Chat = () => {
       });
     }
     const convId = activeConversation?._id;
+
+    // if (user?.settings.media_key && user?.setting?.expiresAt <= now) {
+    //   socket.emit("pre-signature-bgImages", {
+    //     mediaKeys: bgImages,
+    //   });
+    // }
+
     if (!convId) return;
 
     const files = filesByConv[convId] || [];
@@ -224,9 +232,9 @@ const Chat = () => {
         });
       });
       if (getTotalUnreadMessages() > 0) {
-        document.title = `(${getTotalUnreadMessages()}) USDachat`;
+        document.title = `(${getTotalUnreadMessages()})Chat`;
       } else {
-        document.title = "USDachat";
+        document.title = "Chat";
       }
     };
 
@@ -273,7 +281,27 @@ const Chat = () => {
       }
     };
 
+    // const handleBgPreUrls = (data) => {
+    //   if (!data || typeof data !== "object" || !user?._id) return;
+    //   const userItems = data; // sadece kendin için kontrol et
+
+    //   const NOW = Date.now();
+    //   const ONE_HOUR = 60 * 60 * 1000;
+    //   const SAFETY_BUFFER = 5 * 60 * 1000;
+    //   const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
+
+    //   setUser((prev) => ({
+    //     ...prev,
+    //     settings: {
+    //       ...prev.settings,
+    //       chatBgImageUrl: data[0].media_url,
+    //       expiresAt: DEFAULT_EXPIRES_AT,
+    //     },
+    //   }));
+    // };
+
     // 🔧 DÜZELTİLEN KISIM
+
     const handleStatusUpdate = ({
       messageId,
       messageIds,
@@ -300,12 +328,14 @@ const Chat = () => {
     socket.on("messageList", handleMessageList);
     socket.on("pre-urls", handlePreUrls);
     socket.on("pre-avatars", handleAvatarPreUrls);
+    // socket.on("pre-bgImages", handleBgPreUrls);
     socket.on("message:status-update", handleStatusUpdate);
 
     return () => {
       socket.off("messageList", handleMessageList);
       socket.off("pre-urls", handlePreUrls);
       socket.off("pre-avatars", handleAvatarPreUrls);
+      // socket.off("pre-bgImages", handleBgPreUrls);
       socket.off("message:status-update", handleStatusUpdate);
     };
     // aktif konuşma değişirse fallback convId güncel kalsın:
@@ -380,9 +410,7 @@ const Chat = () => {
         });
       }
       upsertProfileAvatars(r.data, userId, dispatch, store.getState);
-      console.log("data: ", r);
       if (r.message === "send-message") {
-        console.log("girdi");
         playNotificationSound();
       }
     };
@@ -399,7 +427,10 @@ const Chat = () => {
   const handleOption2Click = () => setActivePage("option2");
   const handleOption3Click = () => setActivePage("option3");
   const handleOption4Click = () => setActivePage("option4");
-  const handleSettings = () => setActivePage("profileSettings");
+  const handleSettings = () => {
+    setActivePage("profileSettings");
+    setactiveConversationId(null);
+  };
   return (
     <>
       <title>Chat</title>
@@ -444,7 +475,7 @@ const Chat = () => {
               <button
                 className="btn-dark fa-solid fa-gear"
                 id="option5"
-                onClick={handleOption1Click}
+                onClick={handleSettings}
               />
             </div>
             <div className="option">
@@ -463,6 +494,7 @@ const Chat = () => {
             conversations={conversations}
             userId={userId}
             setactiveConversationId={setactiveConversationId}
+            activeConversationId={activeConversationId}
             status={status}
             messagesByConv={messagesByConv}
           />
@@ -470,17 +502,23 @@ const Chat = () => {
         {activePage === "option2" && <Option2 />}
         {activePage === "option3" && <Option3 />}
         {activePage === "option4" && <Option4 />}
-        {activePage === "profileSettings" && <ProfileSettings />}
+        {activePage === "profileSettings" && (
+          <ProfileSettings socket={socket} user={user} setUser={setUser} />
+        )}
         {/* Chat Panel */}
-        <ChatPanel
-          messages={messagesByConv}
-          activeConversation={activeConversation}
-          fileS={filesByConv}
-          userId={userId}
-          socket={socket}
-          fetchingNew={fetchingNew} // 👈 yeni mesaj animasyonu için
-          isOnline={isConnected}
-        />
+        {activePage === "chatList" ? (
+          <ChatPanel
+            messages={messagesByConv}
+            activeConversation={activeConversation}
+            fileS={filesByConv}
+            userId={userId}
+            socket={socket}
+            fetchingNew={fetchingNew} // 👈 yeni mesaj animasyonu için
+            isOnline={isConnected}
+          />
+        ) : (
+          <SettingsPanel />
+        )}
       </div>
       <button
         className="reset"

@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
 import { useMediaUrl } from "../hooks/useMediaUrl";
+import BackgroundSetting from "./BackgroundSetting";
 
-export default function ProfileSettings() {
+export default function ProfileSettings({ socket, user, setUser }) {
   const fileInputRef = useRef(null);
-  const { user, setUser } = useUser();
   const [profileImage, setProfileImage] = useState(
     useMediaUrl(user.avatar) || "https://avatar.iran.liara.run/public/49"
   );
@@ -18,8 +18,6 @@ export default function ProfileSettings() {
   const [about, setAbout] = useState(user.about || "");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
-
-  useEffect(() => {}, [user]);
 
   // ---- Fotoğraf: dosya seç, preview göster ----
   const handleFileChange = (e) => {
@@ -35,20 +33,6 @@ export default function ProfileSettings() {
     try {
       setIsUpdating(true);
 
-      // 1) presigned url al
-      const { data } = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/profile`,
-        {
-          params: { user_id: user._id, fileType: newFile.type },
-        }
-      );
-      const { uploadURL, media_key } = data;
-
-      // 2) S3'e yükle (PUT)
-      await axios.put(uploadURL, newFile, {
-        headers: { "Content-Type": newFile.type },
-      });
-
       // 4) profil patch (sadece avatar)
       const patchResp = await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
@@ -59,7 +43,10 @@ export default function ProfileSettings() {
       );
 
       if (patchResp.data.success) {
-        setUser(patchResp.data.user); // 🔥 tüm uygulamada güncel
+        setUser((prev) => ({
+          ...prev,
+          avatar: patchResp.data.user.avatar,
+        }));
         setNewFile(null);
       }
       setNewFile(null);
@@ -227,6 +214,8 @@ export default function ProfileSettings() {
             <span>{user.phone || "Numara eklenmedi"}</span>
           </div>
         </div>
+
+        <BackgroundSetting socket={socket} user={user} setUser={setUser} />
       </div>
     </div>
   );

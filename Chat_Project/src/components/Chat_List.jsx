@@ -316,6 +316,7 @@ export default function ChatList({
   messagesByConv = {}, // <-- YENİ
   userId,
   setactiveConversationId,
+  activeConversationId,
   status,
 }) {
   // search state
@@ -455,7 +456,7 @@ export default function ChatList({
 
   const onSelect = useCallback(
     (id) => setactiveConversationId(id),
-    [setactiveConversationId]
+    [activeConversationId]
   );
 
   return (

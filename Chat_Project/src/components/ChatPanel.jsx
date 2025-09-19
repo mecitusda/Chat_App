@@ -25,6 +25,7 @@ import { setAtBottom } from "../slices/uiSlice";
 import { upsertFiles } from "../slices/fileSlice";
 import ProfileDrawer from "../components/ProfileDrawer";
 import { useMediaUrl } from "../hooks/useMediaUrl";
+import { useUser } from "../contextAPI/UserContext";
 /* ------ Mesaj durum ikonu (aggregate) ------ */
 function getStatusIconByStatus(status) {
   switch (status) {
@@ -150,7 +151,6 @@ function getHeaderAvatarKey(conversation, selfId) {
 }
 
 const ChatPanel = ({
-  messages,
   activeConversation,
   userId,
   fileS,
@@ -159,6 +159,7 @@ const ChatPanel = ({
   isOnline,
 }) => {
   //console.log("messages: ", messages);
+  const { user, setUser } = useUser();
   const convId = activeConversation?._id;
   const dispatch = useDispatch();
 
@@ -184,6 +185,7 @@ const ChatPanel = ({
   const canLoadOlder = !!isOnline && !!hasMoreOlder;
   //console.log("mesajlar:", convMessages);
   /* read throttle/guard */
+
   const sentReadRef = useRef(new Set());
   const readDebounceRef = useRef(null);
 
@@ -208,11 +210,12 @@ const ChatPanel = ({
   //file Prev
   const [file, setFile] = useState(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState(null);
-  console.log("dosya seçili: ", file);
+
+  const background = user?.settings?.chatBgImage;
   useEffect(() => {
     if (!socket || !convId) return;
     socket.emit("watch-conversation", { conversationId: convId });
-  }, [socket, convId]);
+  }, [socket, activeConversation?._id]);
 
   /* Görünen yeni gelen mesajları DELIVERED yap (deliveredTo listesine göre) */
   useEffect(() => {
@@ -711,7 +714,15 @@ const ChatPanel = ({
         onWheel={canLoadOlder ? handleWheel : undefined}
         onTouchStart={canLoadOlder ? handleTouchStart : undefined}
         onTouchMove={canLoadOlder ? handleTouchMove : undefined}
-        style={{ overflowY: "auto", position: "relative" }}
+        style={{
+          overflowY: "auto",
+          position: "relative",
+          background:
+            background?.startsWith("http") ||
+            background?.startsWith("/backgrounds")
+              ? `url(${background}) center/cover`
+              : background || "#1C1C1C",
+        }}
       >
         {activeConversation && (
           <>

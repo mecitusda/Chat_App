@@ -305,13 +305,11 @@ io.on("connection", (socket) => {
 
   socket.on("pre-signature-files",async ({mediaKeys,conversationId}) => {
     try{
-      console.log("Sonuç: ",mediaKeys)
       const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/files`,{
        mediaKeys
       })
       
       const urls = response.data;
-      console.log("urller yollanıyor.")
       socket.emit("pre-urls",{urls,conversationId})
     }catch (err) {
       console.error("messages error:", err);
@@ -334,6 +332,36 @@ io.on("connection", (socket) => {
       socket.emit("error", "pre-signature alınamadı");
     }
   })
+
+  // socket.on("pre-signature-bgImages", async ({ mediaKeys }) => {
+  // try {
+  //   console.log("istek geldi.")
+  //   const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/bgImages`, {
+  //     backgrounds: mediaKeys,
+  //   });
+ 
+  //   const urls = response.data;
+  //      console.log("bg-url :", urls)
+  //   socket.emit("pre-bgImages", urls); // geri yolla
+  // } catch (err) {
+  //   console.error("bgImage pre-signature error:", err);
+  //   socket.emit("error", "Arka plan URL'leri alınamadı");
+  // }
+  // });
+
+  // socket.on("user-bg",async () => {
+  //   try {
+  //   const response = await axios.post(`${BACKEND_URL}/api/file/presigned-url/bgImages`, {
+  //     backgrounds: mediaKeys,
+  //   });
+
+  //   const urls = response.data;
+  //   socket.emit("pre-bgImages", urls); // geri yolla
+  // } catch (err) {
+  //   console.error("bgImage pre-signature error:", err);
+  //   socket.emit("error", "Arka plan URL'leri alınamadı");
+  // }
+  // })
 
   socket.on("presence:subscribe", ({ userIds = [] } = {}) => {
     for (const uid of userIds) socket.join(`presence:user:${String(uid)}`);
