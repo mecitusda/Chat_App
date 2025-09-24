@@ -1,25 +1,18 @@
+// components/NotificationBanner.jsx
 import React, { useEffect, useState } from "react";
 
-const NotificationBanner = ({ show }) => {
+export default function NotificationBanner({ show }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (show) {
       setVisible(true);
-
-      const timer = setTimeout(() => {
-        setVisible(false);
-      }, 3000); // 3 saniye sonra gizle
-
+      const timer = setTimeout(() => setVisible(false), 3000);
       return () => clearTimeout(timer);
     }
   }, [show]);
 
   return (
-    <div className={`notification-banner ${visible ? "show" : ""}`}>
-      🔔 Basma demedik mi amınakoduğum.
-    </div>
+    <div className={`notification-banner ${visible ? "show" : ""}`}>{show}</div>
   );
-};
-
-export default NotificationBanner;
+}

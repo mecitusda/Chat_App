@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { useUser } from "../contextAPI/UserContext";
-import { useMediaUrl } from "../hooks/useMediaUrl";
 import BackgroundSetting from "./BackgroundSetting";
+import { useUser } from "../contextAPI/UserContext";
 
-export default function ProfileSettings({ socket, user, setUser }) {
+export default function ProfileSettings({ socket, showNotification }) {
   const fileInputRef = useRef(null);
+  const { user, setUser } = useUser();
   const [profileImage, setProfileImage] = useState(
-    useMediaUrl(user.avatar) || "https://avatar.iran.liara.run/public/49"
+    user.avatar?.url || "/images/default-avatar.jpg"
   );
-  //console.log(useMediaUrl(user.avatar));
-
+  if (!user) {
+    return <div>Profil yükleniyor...</div>;
+  }
   const [newFile, setNewFile] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -18,40 +19,74 @@ export default function ProfileSettings({ socket, user, setUser }) {
   const [about, setAbout] = useState(user.about || "");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
+  async function fetchUserAvatar() {
+    const now = Date.now();
+    if (
+      (user.avatar && !user.avatar?.url_expiresAt) ||
+      new Date(user.avatar?.url_expiresAt) <= now
+    ) {
+      const { data } = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/${user?._id}`
+      );
+      setUser((prev) => ({
+        ...prev,
+        avatar: data.avatar, // { key, url, url_expiresAt }
+      }));
+    }
+  }
+  fetchUserAvatar();
+  useEffect(() => {
+    setProfileImage(user.avatar?.url || "/images/default-avatar.jpg");
+  }, [user.avatar]);
 
-  // ---- Fotoğraf: dosya seç, preview göster ----
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setNewFile(file);
-    setProfileImage(URL.createObjectURL(file)); // preview
+    setProfileImage(URL.createObjectURL(file));
   };
 
-  // ---- Fotoğraf: S3'e yükle + avatar patch ----
   const handleAvatarUpdate = async () => {
     if (!newFile) return;
     try {
       setIsUpdating(true);
 
-      // 4) profil patch (sadece avatar)
+      // 1) presigned url al
+      const { data } = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/profile`,
+        {
+          params: { user_id: user._id, fileType: newFile.type },
+        }
+      );
+      const { uploadURL, media_key } = data;
+
+      // 2) S3'e yükle (PUT)
+      await axios.put(uploadURL, newFile, {
+        headers: { "Content-Type": newFile.type },
+      });
+
+      // 3) backend'e avatar kaydet (sadece key)
       const patchResp = await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
         {
           user_id: user._id,
-          avatar: media_key,
+          avatar: media_key, // backend avatar.key olarak kaydedecek
         }
       );
 
       if (patchResp.data.success) {
         setUser((prev) => ({
           ...prev,
-          avatar: patchResp.data.user.avatar,
+          avatar: {
+            url: patchResp.data.user.avatar.url,
+            url_expiresAt: patchResp.data.user.avatar.url_expiresAt,
+          }, // { key, url, url_expiresAt }
         }));
+
+        setProfileImage(patchResp.data.user.avatar.url);
         setNewFile(null);
+        showNotification("🔔Profil fotoğrafı güncellendi.");
       }
-      setNewFile(null);
-      // burada istersen context'i de güncelle
-      // setUser({ ...user, avatar: avatarUrl });
     } catch (err) {
       console.error("Avatar güncelleme hatası:", err);
       alert("Avatar güncellenemedi");
@@ -60,49 +95,42 @@ export default function ProfileSettings({ socket, user, setUser }) {
     }
   };
 
-  // ---- İsim güncelle ----
   const handleNameUpdate = async () => {
     try {
       setIsUpdating(true);
       const resp = await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
-        {
-          user_id: user._id,
-          username: name,
-        }
+        { user_id: user._id, username: name }
       );
-      if (resp.data.success) {
-        setUser(resp.data.user); // context güncellendi
+      if (resp.data.success && resp.data.user) {
+        setUser(resp.data.user);
         setIsEditingName(false);
+        showNotification("🔔Kullanıcı adı güncellendi.");
       }
-      // setUser({ ...user, username: name });
     } catch (err) {
-      console.error(err);
-      alert("İsim güncellenemedi");
+      console.error("İsim güncellenemedi:", err);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // ---- Hakkımda güncelle ----
   const handleAboutUpdate = async () => {
     try {
       setIsUpdating(true);
       const resp = await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
-        {
-          user_id: user._id,
-          about,
-        }
+        { user_id: user._id, about }
       );
-      if (resp.data.success) {
-        setAbout(resp.data.user.about);
+      if (resp.data.success && resp.data.user) {
+        setUser((prev) => ({
+          ...prev,
+          about: resp.data.user.about,
+        }));
         setIsEditingAbout(false);
+        showNotification("🔔Hakkında alanı güncellendi.");
       }
-      // setUser({ ...user, about });
     } catch (err) {
-      console.error(err);
-      alert("Hakkımda güncellenemedi");
+      console.error("Hakkımda güncellenemedi:", err);
     } finally {
       setIsUpdating(false);
     }
@@ -206,7 +234,7 @@ export default function ProfileSettings({ socket, user, setUser }) {
           )}
         </div>
 
-        {/* TELEFON (readonly) */}
+        {/* TELEFON */}
         <div className="profile__field">
           <label>Telefon</label>
           <div className="readonly__display">
@@ -215,7 +243,8 @@ export default function ProfileSettings({ socket, user, setUser }) {
           </div>
         </div>
 
-        <BackgroundSetting socket={socket} user={user} setUser={setUser} />
+        {/* ARKA PLAN SEÇİMİ */}
+        <BackgroundSetting showNotification={showNotification} />
       </div>
     </div>
   );

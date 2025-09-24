@@ -1,78 +1,63 @@
-import React, { useState } from "react";
-import { useUser } from "../contextAPI/UserContext.jsx"; //Dikkat Yeni açıldığında düzelt buga girdi.
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "../contextAPI/UserContext.jsx";
 
-export default function UserIdGate() {
-  const { user, setUser } = useUser();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function UserIdGate({
+  handleClick,
+  setResetEnabled,
+  setActiveConversation,
+  setactiveConversationId,
+}) {
+  const { setUser, clearUser } = useUser(); // 👈 senin context'teki isimler
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
-  const [err, setErr] = useState("");
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem("token");
 
-  if (user) return null; // zaten kayıtlıysa modal açma
+      if (!token) {
+        clearUser();
+        setLoading(false);
+        navigate("/login", { replace: true });
+        return;
+      }
 
-  const submit = async (e) => {
-    e.preventDefault();
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/auth/me`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const data = await res.json();
 
-    const em = email.trim();
-    const p = password.trim();
+        if (data.success) {
+          setUser(data.user); // 👈 user’ı context’e kaydet
+          navigate("/chat", { replace: true });
+        } else {
+          setResetEnabled(true);
+          handleClick();
+          clearUser(); // 👈 user’ı sıfırla
+          setActiveConversation(null);
+          setactiveConversationId(null);
+          navigate("/login", { replace: true });
+        }
+      } catch (err) {
+        console.error("Auth kontrolü hatası:", err);
+        clearUser();
+        navigate("/login", { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (!em || !p) {
-      return setErr("Lütfen email ve şifre gir.");
-    }
-    // basit validasyon (harf-rakam-altçizgi)
-    if (!/^[A-Za-z0-9@._-]{4,40}$/.test(em)) {
-      return setErr("Geçerli bir email girin. (Harf, rakam, @, _ ve -)");
-    }
+    checkAuth(); // sadece mount’ta çalışır
+  }, []);
 
-    console.log("değerler: ", em, p);
-    const response = await fetch(`http://127.0.0.1:5000/api/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: em,
-        password: p,
-      }),
-    }).then(async (r) => await r.json());
-    console.log(response);
-    if (response.success) setUser(response.user);
-  };
+  if (loading) {
+    return <div className="loading">🔄 Giriş kontrol ediliyor...</div>;
+  }
 
-  return (
-    <div className="uid-modal">
-      <div className="uid-backdrop" />
-      <form className="uid-card" onSubmit={submit}>
-        <h3>Email</h3>
-        <p>
-          Karşılıklı görünürlük için bir <b>email</b> gir:
-        </p>
-        <input
-          autoFocus
-          type="text"
-          placeholder="ör. arif_01"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setErr("");
-          }}
-        />
-        <p>
-          Karşılıklı görünürlük için bir <b>şifre</b> gir:
-        </p>
-        <input
-          autoFocus
-          type="text"
-          placeholder="ör. Kardelen123"
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setErr("");
-          }}
-        />
-        {err && <div className="uid-error">{err}</div>}
-        <button type="submit">Devam</button>
-      </form>
-    </div>
-  );
+  return null;
 }

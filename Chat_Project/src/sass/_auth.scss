@@ -1,0 +1,146 @@
+/* Kart */
+.auth-container {
+  background: #1c1c1c;
+  color: #fff;
+  width: 30%;
+  min-width: 400px;
+  padding: 4rem 3rem;
+  border-radius: 1rem;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+  font-family: 'Orbitron', sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5rem;
+
+  /* biraz daha uzun olsun */
+  min-height: 50vh;
+
+  h2 {
+    margin: 0;
+    font-size: clamp(2.4rem, 3vw, 3rem); /* büyütüldü */
+    font-weight: 700;
+    color: #ffcc00;
+    text-shadow: 0 0 10px rgba(255, 204, 0, 0.9);
+  }
+
+  p {
+    margin: 0.75rem 0 0;
+    cursor: pointer;
+    font-size: 1.25rem; /* büyütüldü */
+    color: #aaa;
+    &:hover { color: #fff; }
+  }
+}
+
+/* Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+  width: 100%;
+
+  input {
+    padding: 1.5rem;
+    font-size: 1.25rem; /* yazı büyütüldü */
+    border-radius: 12px;
+    border: 1px solid #333;
+    background: #2b2b2b;
+    color: #fff;
+    outline: none;
+
+    &::placeholder {
+      font-size: 1.15rem; /* placeholder büyütüldü */
+      color: #888;
+    }
+
+    &:focus {
+      border: 2px solid #ffcc00;
+    }
+  }
+
+  button {
+    padding: 1.4rem;
+    border: none;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 1.35rem; /* daha büyük buton yazısı */
+    cursor: pointer;
+    background: linear-gradient(45deg, #ffaa00, #ffcc00);
+    color: #000;
+    transition: 0.25s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(255, 204, 0, 0.35);
+    }
+
+    &:disabled {
+      background: #555;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  }
+}
+
+/* Telefon input grubu */
+.phone-input {
+  display: flex;
+  gap: 0.75rem;
+
+  select {
+    min-width: 150px;
+    padding: 1.1rem;
+    border-radius: 10px;
+    border: none;
+    background: #2b2b2b;
+    color: #fff;
+    outline: none;
+    font-size: 1.15rem; /* büyütüldü */
+  }
+
+  input[type="tel"] {
+    flex: 1;
+    padding: 1.2rem;
+    border-radius: 10px;
+    border: none;
+    background: #2b2b2b;
+    color: #fff;
+    outline: none;
+    font-size: 1.25rem; /* büyütüldü */
+    &::placeholder { color: #888; }
+    &:focus { border: 2px solid #00c4ff; }
+  }
+}
+
+/* Alt kısım */
+.auth-switch {
+  margin-top: 0.75rem;
+  font-size: 1.25rem; /* büyütüldü */
+  a {
+    color: #00c4ff;
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+/* 📱 Mobil */
+@media (max-width: 768px) {
+  .auth-container {
+    width: 90%;
+    min-height: auto;   /* mobilde serbest */
+    padding: 2.5rem 1.5rem;
+  }
+
+  .auth-form input,
+  .auth-form button {
+    padding: 1.1rem;
+    font-size: 1.1rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+  }
+}

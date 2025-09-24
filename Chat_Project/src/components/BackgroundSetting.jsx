@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
 
@@ -21,12 +21,15 @@ const backgrounds = [
   "bg16.jpg",
 ];
 
-export default function BackgroundSetting() {
+export default function BackgroundSetting({ showNotification }) {
   const { user, setUser } = useUser();
   const currentImageUrl = user?.settings?.chatBgImage || "";
   const currentColor = user?.settings?.chatBgColor || "#000000";
   const [showList, setShowList] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [visibleCount, setVisibleCount] = useState(5);
+  const observerRef = useRef();
 
   const handleSelect = async (bgFilename) => {
     try {
@@ -51,6 +54,7 @@ export default function BackgroundSetting() {
           },
         }));
         setShowList(false);
+        showNotification("🔔Arka plan güncellendi.");
       }
     } catch (err) {
       console.error("Arka plan güncellenemedi:", err);
@@ -68,7 +72,7 @@ export default function BackgroundSetting() {
         {
           userId: user._id,
           chatBgColor: color,
-          chatBgImageUrl: null,
+          chatBgImage: null,
         },
         { withCredentials: true }
       );
@@ -79,7 +83,7 @@ export default function BackgroundSetting() {
           settings: {
             ...prev.settings,
             chatBgColor: color,
-            chatBgImageUrl: null,
+            chatBgImage: null,
           },
         }));
         setShowList(false);
@@ -90,6 +94,23 @@ export default function BackgroundSetting() {
       setLoading(false);
     }
   };
+
+  // Lazy load için IntersectionObserver
+  const lastThumbRef = useCallback(
+    (node) => {
+      if (loading) return;
+      if (observerRef.current) observerRef.current.disconnect();
+
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && visibleCount < backgrounds.length) {
+          setVisibleCount((prev) => prev + 5); // her seferinde 5 tane daha
+        }
+      });
+
+      if (node) observerRef.current.observe(node);
+    },
+    [loading, visibleCount]
+  );
 
   return (
     <div className="bg-setting">
@@ -109,15 +130,17 @@ export default function BackgroundSetting() {
         <div className="bg-overlay">
           <div className="bg-modal">
             <button className="bg-close-btn" onClick={() => setShowList(false)}>
-              x
+              ×
             </button>
             <h4>Arka Plan Seç</h4>
             <div className="bg-thumb-list">
-              {backgrounds.map((bg, index) => {
+              {backgrounds.slice(0, visibleCount).map((bg, index) => {
                 const fullPath = `/backgrounds/${bg}`;
+                const isLast = index === visibleCount - 1;
                 return (
                   <div
-                    key={index}
+                    key={bg}
+                    ref={isLast ? lastThumbRef : null}
                     className="bg-thumb"
                     style={{ backgroundImage: `url(${fullPath})` }}
                     onClick={() => handleSelect(bg)}

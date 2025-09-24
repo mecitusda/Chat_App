@@ -130,13 +130,13 @@
 //                       ? conversation.members[0].user._id === userId
 //                         ? conversation.members[1].user.avatar
 //                           ? useMediaUrl(conversation.members[1].user.avatar)
-//                           : "https://avatar.iran.liara.run/public/49"
+//                           : "https://avatar.iran.liara.run/public/1"
 //                         : conversation.members[0].user.avatar
 //                         ? useMediaUrl(conversation.members[0].user.avatar)
-//                         : "https://avatar.iran.liara.run/public/49"
+//                         : "https://avatar.iran.liara.run/public/1"
 //                       : conversation.avatar
 //                       ? useMediaUrl(conversation.avatar)
-//                       : "https://avatar.iran.liara.run/public/49"
+//                       : "https://avatar.iran.liara.run/public/1"
 //                   }
 //                   alt="User"
 //                   className="chat__avatar"
@@ -191,13 +191,15 @@ import React, {
 } from "react";
 import { FiWifiOff } from "react-icons/fi";
 import { useMediaUrl } from "../hooks/useMediaUrl";
+import { useUser } from "../contextAPI/UserContext";
+import DropdownMenu from "./DropdownMenu";
 
 // ==== helpers ====
 const MAX_SCAN_MSGS = 60; // içerik aramada taranacak mesaj sayısı (son N)
 const norm = (s) => (s || "").toString().toLowerCase();
 const trimSpaces = (s) => (s || "").toString().trim();
 const EMPTY = [];
-const FALLBACK_AVATAR = "https://avatar.iran.liara.run/public/49";
+const FALLBACK_AVATAR = "/images/default-avatar.jpg";
 
 function formatSimpleTime(iso) {
   if (!iso) return "";
@@ -270,8 +272,7 @@ const ChatListItem = memo(function ChatListItem({
     (conversation.members?.[0]?.user?._id === userId
       ? conversation.members?.[1]?.user
       : conversation.members?.[0]?.user);
-  const avatarKey = isPrivate ? other?.avatar : conversation.avatar;
-  const avatarUrl = useMediaUrl(avatarKey);
+  const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar.url;
 
   const lastMsg = conversation.last_message;
 
@@ -318,11 +319,57 @@ export default function ChatList({
   setactiveConversationId,
   activeConversationId,
   status,
+  socket,
 }) {
   // search state
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const inputRef = useRef(null);
+  const { user } = useUser();
+  useEffect(() => {
+    if (!socket || !conversations?.length || !user?._id) return;
+    const now = Date.now();
+
+    const expiredConvAvatars = [];
+
+    conversations.forEach((conv) => {
+      if (conv.type === "group") {
+        // Grup → sadece conversation avatarını kontrol et
+        if (
+          conv.avatar?.url &&
+          (!conv.avatar.url_expiresAt ||
+            new Date(conv.avatar.url_expiresAt) <= now)
+        ) {
+          expiredConvAvatars.push({
+            conversationId: conv._id,
+            type: "conversation",
+          });
+        }
+      } else if (conv.type === "private") {
+        // Private → karşı tarafın avatarını kontrol et
+        const otherMember = conv.members.find(
+          (m) => String(m.user._id) !== String(user._id)
+        );
+
+        if (
+          otherMember?.user?.avatar?.url &&
+          (!otherMember.user.avatar.url_expiresAt ||
+            new Date(otherMember.user.avatar.url_expiresAt) <= now)
+        ) {
+          expiredConvAvatars.push({
+            userId: otherMember.user._id,
+            conversationId: conv._id,
+            type: "user",
+          });
+        }
+      }
+    });
+
+    if (expiredConvAvatars.length > 0) {
+      //console.log("süresi dolanlar: ", expiredConvAvatars);
+      socket.emit("refresh-conversation-avatars", expiredConvAvatars);
+    }
+  }, [socket, conversations, user?._id]);
 
   // debounce
   useEffect(() => {
@@ -483,8 +530,13 @@ export default function ChatList({
         )}
 
         <div className="list__buttons">
-          <button className=" list__btn fa-solid fa-comment-medical"></button>
-          <button className="list__btn fa-solid fa-ellipsis-vertical"></button>
+          <div className="disabled-tip">
+            <button className=" list__btn fa-solid fa-comment-medical"></button>
+          </div>
+
+          <div className="list__btn">
+            <DropdownMenu />
+          </div>
         </div>
       </header>
 

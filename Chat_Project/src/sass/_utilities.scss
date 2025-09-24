@@ -16,14 +16,14 @@
     border-radius: 5px;
     border: none;
     cursor: pointer;
-    transition: all .5s;
+    transition: all .2s;
 }
 
 .btn {
    &-primary{
     @extend %btn-shared;
-    background-color: variables.$primary-color;
-    color: variables.$dark-color;
+    background-color: variables.$accent;
+    color: variables.$light-color;
    }
 
    &-light{
@@ -42,15 +42,23 @@
      color: variables.$light-color;
      background-color: variables.$medium-color;
     }
-
+    &-success{
+     @extend %btn-shared;
+     color: variables.$light-color;
+     background-color: variables.$success;
+    }
+    &-danger{
+     @extend %btn-shared;
+     color: variables.$light-color;
+     background-color: variables.$danger;
+    }
 }
 
 button[class^='btn-']:hover,
 a[class^='btn-']:hover,
 input[class^='btn-']:hover
 {
-    background-color: variables.$primary-color;
-    color: variables.$light-color;
+    opacity: 0.7;
 }
 
 //backgrounds

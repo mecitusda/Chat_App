@@ -3,12 +3,18 @@ import { useSelector } from "react-redux";
 import { selectPresence } from "../slices/presenceSlice";
 
 function formatLastSeen(ts) {
-  if (!ts) return "Çevrimdışı";
+  if (!ts || typeof ts !== "number" || isNaN(ts)) {
+    return "Çevrimdışı";
+  }
   const d = new Date(ts);
-  return `son görülme ${d.toLocaleTimeString("tr-TR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  return `son görülme ${
+    ts
+      ? d.toLocaleTimeString("tr-TR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : ""
+  }`;
 }
 
 const ChatPanel_Header = ({

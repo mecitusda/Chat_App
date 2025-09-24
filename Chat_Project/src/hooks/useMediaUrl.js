@@ -2,6 +2,6 @@
 import { useSelector } from "react-redux";
 import { selectMediaUrl } from "../helpers/mediaSelectors";
 
-export function useMediaUrl(mediaKey) {
-  return useSelector(state => selectMediaUrl(state, mediaKey));
+export  function useMediaUrl(mediaKey) {
+  return null;
 }

@@ -1,39 +1,56 @@
-import React, { useState } from "react";
-import Header from "../components/Header";
+// MainLayout.jsx
+import { useState } from "react";
 import { Outlet } from "react-router";
-import Footer from "../components/Footer";
+import { useDispatch } from "react-redux";
 import { resetConversation } from "../slices/conversationSlice.js";
 import { resetFile } from "../slices/fileSlice.js";
 import { resetMessages } from "../slices/messageSlice.js";
-import { useDispatch, useSelector } from "react-redux";
-// import { ThemeContext } from "../contexts/ThemeContext";
-const MainLayout = ({}) => {
+import { resetFriends } from "../slices/friendSlice.js";
+import { resetAllPagination } from "../slices/paginationSlice.js";
+import NotificationBanner from "../components/NotificationBanner.jsx";
+import UserIdGate from "../components/UserIdGate.jsx";
+
+const MainLayout = () => {
   const SOCKET_URL = import.meta.env.VITE_BACKEND_SOCKET_URL;
   const dispatch = useDispatch();
-  //dispatch(resetConversation());
-  //dispatch(resetMessages());
-  //dispatch(resetFile());
-  //   const { theme } = useContext(ThemeContext);
-  //   const color = theme === "dark" ? "bg-dark text-white" : "bg-light text-dark";
+
   const [activeConversation, setActiveConversation] = useState(null);
-  const [resetEnabled, setResetEnabled] = useState(true);
+  const [resetEnabled, setResetEnabled] = useState(false);
+  const [banner, setBanner] = useState({ message: "", ts: 0 });
+  const [activeConversationId, setactiveConversationId] = useState(null);
+
+  const showNotification = (msg) => {
+    setBanner({ message: msg, ts: Date.now() }); // ts = benzersiz anahtar
+  };
 
   const handleClick = () => {
     if (resetEnabled) {
       dispatch(resetConversation());
       dispatch(resetMessages());
       dispatch(resetFile());
+      dispatch(resetFriends());
+      dispatch(resetAllPagination());
+      setResetEnabled(false);
     }
   };
 
-  // console.log(
-  //   "maindeki chat: ",
-  //   useSelector((s) => s.conversations.list || [])
-  // );
   return (
     <>
-      {/* <Header /> */}
       <main>
+        {/* Kullanıcı login kontrolü */}
+        <UserIdGate
+          setResetEnabled={setResetEnabled}
+          handleClick={handleClick}
+          setActiveConversation={setActiveConversation}
+          setactiveConversationId={setactiveConversationId}
+        />
+
+        {/* Banner mesajı */}
+        {banner.message && (
+          <NotificationBanner key={banner.ts} show={banner.message} />
+        )}
+
+        {/* Outlet + context forwarding */}
         <Outlet
           context={{
             activeConversation,
@@ -42,10 +59,14 @@ const MainLayout = ({}) => {
             setResetEnabled,
             handleClick,
             resetEnabled,
+            banner,
+            setBanner,
+            showNotification,
+            activeConversationId,
+            setactiveConversationId,
           }}
         />
       </main>
-      {/* <Footer /> */}
     </>
   );
 };

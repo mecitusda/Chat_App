@@ -6,10 +6,7 @@ const router = express.Router();
 import mongoose from "mongoose"
 const { Types: { ObjectId } } = mongoose;
 
-const rank = { sent: 1, delivered: 2, read: 3 };
-function canUpgrade(current, next) {
-  return (rank[next] || 0) > (rank[current] || 0);
-}
+
 
 
 // GET
@@ -19,7 +16,6 @@ router.get("/last-seen",async (req,res) => {
     const format = String(req.query.format || "iso").toLowerCase(); // "iso" | "ms"
     const users = await User.find({});
     const userMap = {};
-
     for (const d of users) {
       const t = d.last_seen ? new Date(d.last_seen) : null;
       userMap[String(d._id)] =
@@ -31,150 +27,132 @@ router.get("/last-seen",async (req,res) => {
     }
     res.json({ success: true, count: userMap.length, lastSeen: userMap });
   }catch(err){
-     console.error("GET /users/last-seen error:", err);
-    res.status(500).json({ success: false, error: "Sunucu hatası" });
+     console.error("GET /users/last-seen error:", err.message);
+    res.status(500).json({ success: false, error: "Sunucu hatası: " +err.message });
   }
 });
 
-router.get('/messages/:conversationId', async (req, res) => {
+router.get("/messages/:conversationId", async (req, res) => {
   try {
     const { conversationId } = req.params;
-    let { limit, after, before, populate , userId } = req.query;
+    let { limit, after, before, populate, userId } = req.query;
+
     const LIM = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-    // 1) Query kur (cursor objesini güvenli kur)
+
+    // 1) Query
     const query = { conversation: conversationId };
     const idCond = {};
-    if (after && ObjectId.isValid(after))  idCond.$gt = new ObjectId(after);  // after → daha yeni
-    if (before && ObjectId.isValid(before)) idCond.$lt = new ObjectId(before); // before → daha eski
+    if (after && ObjectId.isValid(after)) idCond.$gt = new ObjectId(after);
+    if (before && ObjectId.isValid(before)) idCond.$lt = new ObjectId(before);
     if (Object.keys(idCond).length) query._id = idCond;
 
-    // 2) Sıralama stratejisi
-    // after varsa ileri (kronolojik): _id:1
-    // before varsa geri (eskiye doğru): _id:-1 (sonra UI için ters çeviririz)
-    // ikisi de yoksa ilk sayfa: en yeniler → _id:-1 (sonra ters çevir)
-    const sort =
-      after ? { _id: 1 } :
-      before ? { _id: -1 } :
-      { _id: -1 };
+    // 2) Sort
+    const sort = after ? { _id: 1 } : before ? { _id: -1 } : { _id: -1 };
 
-    // 3) Probe için limit+1 çek
+    // 3) Limit + 1 (probe) — LEAN KULLANMA, method’lar lazım
     let q = Message.find(query).sort(sort).limit(LIM + 1);
-    if (populate && (populate === '1' || populate === 'true')) {
-      q = q.populate("sender", "username avatar");
+    if (populate && (populate === "1" || populate === "true")) {
+      q = q.populate("sender", "username avatar status about");
     }
-    let docs = await q.lean();
+    let docs = await q.exec();
 
-    // 4) hasMore hesapla + fazlayı at
+    // 4) hasMore
     const hasMoreRaw = docs.length > LIM;
     if (hasMoreRaw) docs = docs.slice(0, LIM);
 
-    // 5) UI için kronolojik (eski→yeni) dönmek istiyorsak:
-    const reverseNeeded = !after; // after zaten _id:1 ile kronolojik
+    // 5) UI sırası
+    const reverseNeeded = !after;
     if (reverseNeeded) docs = docs.reverse();
 
-    // 6) Cursorlar (mevcut batch’in uçları)
-    const oldestId = docs.length ? String(docs[0]._id) : null;                   // batch'in en eskisi
-    const newestId = docs.length ? String(docs[docs.length - 1]._id) : null;     // batch'in en yenisi
+    // 6) Cursorlar
+    const oldestId = docs.length ? String(docs[0]._id) : null;
+    const newestId = docs.length ? String(docs[docs.length - 1]._id) : null;
+    const hasMoreBefore = !after ? hasMoreRaw : null;
+    const hasMoreAfter = after ? hasMoreRaw : null;
+    const nextAfter = newestId;
+    const prevBefore = oldestId;
 
-    // 7) Yönlü hasMore
-    // - after modunda: daha da yeni var mı? (probe sonuç) → hasMoreAfter
-    // - before/initial modunda: daha da eski var mı?       → hasMoreBefore
-    const hasMoreBefore =
-      (!after) ? hasMoreRaw : null; // initial/before çağrısında anlamlı
-    const hasMoreAfter =
-      (after) ? hasMoreRaw : null;  // after çağrısında anlamlı
-
-    // 8) Sonraki cursor önerileri
-    const nextAfter  = newestId; // /messages?after=nextAfter → daha yeniye devam
-    const prevBefore = oldestId; // /messages?before=prevBefore → daha eskiye devam
-
-    if(docs.length > 0 ){
+    // 7) lastRead güncelle
+    if (docs.length > 0 && userId) {
       await Conversation.findOneAndUpdate(
-  { _id: conversationId, "members.user": userId },
-  {
-    $set: {
-      "members.$.lastReadMessageId": docs[docs.length-1]._id,
-      "members.$.lastReadAt": new Date(),
-    },
-  }
-);
+        { _id: conversationId, "members.user": userId },
+        {
+          $set: {
+            "members.$.lastReadMessageId": docs[docs.length - 1]._id,
+            "members.$.lastReadAt": new Date(),
+          },
+        }
+      );
     }
 
+    // 8) Medya + sender avatar tazele
+    const processedSenders = new Set();
+    await Promise.all(
+      docs.map(async (doc) => {
+        // mesaj medyası
+        if (doc.media_key && doc.getMediaUrl) {
+          await doc.getMediaUrl(); // expired ise yeniler ve kaydeder
+        }
+
+        // sender avatar (populate açıksa gelir)
+        const s = doc.sender;
+        const senderId = s?._id ? String(s._id) : null;
+        if (s?.getAvatarUrl && senderId && !processedSenders.has(senderId)) {
+          s.avatar.url = await s.getAvatarUrl(); // URL’i güncelle
+          processedSenders.add(senderId);
+        }
+      })
+    );
+
+    // 9) JSON’a çevir
+    const messagesWithMedia = docs.map((d) => d.toJSON());
 
     res.json({
       success: true,
-      messages: docs,
+      messages: messagesWithMedia,
       pageInfo: {
-        count: docs.length,
+        count: messagesWithMedia.length,
         limit: LIM,
-        // çağrı parametreleri (debug için döndürüyoruz)
         after: after || null,
         before: before || null,
-        // devam cursorları
-        nextAfter,      // yeniye devam etmek için
-        prevBefore,     // eskiye devam etmek için
-        // yönlü bayraklar
+        nextAfter,
+        prevBefore,
         hasMoreBefore,
-        hasMoreAfter
-      }
+        hasMoreAfter,
+      },
     });
   } catch (err) {
+    console.error("GET /messages error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
+
+
 // Kullanıcının sohbetlerini listeleme
+
+
 
 router.get("/:id/members", async (req, res) => {
   try {
     const { id } = req.params;
-    const { exclude, populate } = req.query;
 
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ error: "Geçersiz conversation id" });
     }
-    if (exclude && !mongoose.isValidObjectId(exclude)) {
-      return res.status(400).json({ error: "Geçersiz exclude user id" });
-    }
 
-    // Sadece üyeleri çekiyoruz; hızlı olsun diye lean + minimal select
+    // Sadece members içindeki user id’lerini alıyoruz
     const conv = await Conversation.findById(id)
-      .select("members.user")
+      .select("members.user") // sadece üyeler gelsin
       .lean();
 
     if (!conv) {
       return res.status(404).json({ error: "Konuşma bulunamadı" });
     }
 
-    // (Opsiyonel güvenlik) İstek yapan kullanıcının gerçekten üye olduğunu doğrula.
-    // Eğer auth kullanıyorsan req.user.id üzerinden kontrol edebilirsin.
-    // if (!conv.members.some(m => String(m.user) === String(req.user.id))) {
-    //   return res.status(403).json({ error: "Yetkisiz" });
-    // }
+    const memberIds = conv.members.map(m => String(m.user));
 
-    // Exclude’u at ve sadece user id’leri al
-    const memberIds = conv.members
-      .map(m => m.user)
-      .filter(uid => !exclude || String(uid) !== String(exclude));
-
-    // Populate isteniyorsa kullanıcıları çek
-    if (populate === "1") {
-      // ihtiyaç duyduğun alanları seç
-      const users = await User.find({ _id: { $in: memberIds } })
-        .select("_id username avatar")
-        .lean();
-
-      // memberIds sırasını korumak istersen:
-      const map = new Map(users.map(u => [String(u._id), u]));
-      const ordered = memberIds
-        .map(id => map.get(String(id)))
-        .filter(Boolean);
-
-      return res.json({ success: true, members: ordered });
-    }
-
-    // Yalın id listesi
-    return res.json({ success: true, members: memberIds.map(String) });
+    return res.json({ success: true, members: memberIds });
   } catch (err) {
     console.error("GET /conversation/:id/members", err);
     res.status(500).json({ error: "Sunucu hatası" });
@@ -182,58 +160,72 @@ router.get("/:id/members", async (req, res) => {
 });
 
 
+
 router.get("/:userId", async (req, res) => {
   try {
     const me = new mongoose.Types.ObjectId(req.params.userId);
 
-    // 1) Konuşmaları getir (senin mevcut populate'ların korunuyor)
-    const conversations = await Conversation.find({
-      "members.user": me
-    })
-      .sort({ updated_at: -1 })
-      .populate({ path: "last_message.sender", select: "username avatar" })
+    // 1) Document olarak konuşmaları getir
+    let conversations = await Conversation.find({ "members.user": me })
+      .sort({ updatedAt: -1 })
+      .populate("last_message.sender", "username avatar")
       .populate("members.user", "username avatar status about")
       .populate("last_message.message", "")
-      .lean(); // ← sayım yaparken daha rahat
+      .exec();
 
-    // 2) Her konuşma için unread sayısını hesapla (kullanıcıya göre)
+    // 2) Avatarları güncelle
+    for (const conv of conversations) {
+      // ✅ Conversation avatar
+      if (conv.getAvatarUrl) {
+        const updated = await conv.getAvatarUrl();
+        if (updated) conv.avatar = updated;
+      }
+
+      // ✅ Members avatar
+      for (const member of conv.members) {
+        if (member.user?.getAvatarUrl) {
+          const updated = await member.user.getAvatarUrl();
+          if (updated) member.user.avatar = updated;
+        }
+      }
+
+      // ✅ Last message sender avatar
+      if (conv.last_message?.sender?.getAvatarUrl) {
+        const updated = await conv.last_message.sender.getAvatarUrl();
+        if (updated) conv.last_message.sender.avatar = updated;
+      }
+    }
+
+    // 3) JSON objesine çevir
+    conversations = conversations.map((c) => c.toObject());
+
+    // 4) Unread hesapla
     await Promise.all(
       conversations.map(async (c) => {
-        const meMember = (c.members || []).find(
+        const meMember = c.members.find(
           (m) => String(m.user?._id || m.user) === String(me)
         );
-        
         const lastReadId = meMember?.lastReadMessageId || null;
 
-        const query = {
-          conversation: c._id,
-          sender: { $ne: me },             // kendi gönderdiği okunmamış sayılmaz
-        };
-        if (lastReadId) {
-          // son okunan mesajdan sonra gelenler
-          query._id = { $gt: lastReadId };
-        }
+        const query = { conversation: c._id, sender: { $ne: me } };
+        if (lastReadId) query._id = { $gt: lastReadId };
 
         const unread = await Message.countDocuments(query);
-        c.unread = unread; // 👈 frontend bu alanı doğrudan kullanacak
+        c.unread = unread; // artık JSON obje → eklenir
       })
     );
 
     res.json({ success: true, conversations });
   } catch (err) {
-    console.error("GET /conversation/:userId", err);
+    console.error("GET /conversation/:userId error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get("/messages/status/updated", async (req,res) => {
-  try{
 
-  }catch(err){
-    console.error("path /messages/status/updated error: ",err.message)
-    res.json({error:"sunucu hatası."})
-  }
-})
+
+
+
 
 // POST 
 
@@ -260,6 +252,10 @@ router.post("/message", async (req, res) => {
       media_key, mimetype, size, media_duration,
       call_info,
     });
+
+    if(message.media_key){
+      await message.getMediaUrl();
+    }
     
     const chat = await Conversation.findByIdAndUpdate(
       conversation,
@@ -315,6 +311,59 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("Sohbet oluşturma hatası:", error);
     res.status(500).json({ error: "Sunucu hatası" });
+  }
+});
+
+
+
+
+router.patch("/:id/avatar", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { avatarKey } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Geçersiz conversation id" });
+    }
+
+    if (!avatarKey || typeof avatarKey !== "string") {
+      return res.status(400).json({ success: false, message: "avatarKey gerekli" });
+    }
+
+    // Avatarı güncelle
+    const updated = await Conversation.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          "avatar.key": avatarKey.trim(),
+          "avatar.url": "",
+          "avatar.url_expiresAt": null,
+          updated_at: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Konuşma bulunamadı" });
+    }
+
+    // ✅ Güncel URL üret (presigned)
+    const avatarUrl = await updated.getAvatarUrl();
+
+    res.json({
+      success: true,
+      conversation: {
+        _id: updated._id,
+        name: updated.name,
+        type: updated.type,
+        avatar: { url: avatarUrl },
+        updated_at: updated.updated_at,
+      },
+    });
+  } catch (err) {
+    console.error("PATCH /conversations/:id/avatar error:", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası: "+err});
   }
 });
 
@@ -440,7 +489,6 @@ router.patch("/message/status", async (req, res) => {
 
       const lastMessage = await Message.findOne({ _id: { $in: ids } })
   .sort({ _id: -1 }); // ObjectId sırasına göre en yeni
-      console.log()
       await Conversation.updateOne(
   { _id: convId, "members.user": by },
   {
@@ -468,6 +516,7 @@ router.patch("/message/status", async (req, res) => {
 router.patch('/user/last_seen/:id', async (req,res) => {
   const {id} = req.params;
   try{
+    console.log("girdi")
     const setLast_Seen = await User.findByIdAndUpdate({_id:id},{$set:{last_seen:Date.now()}})
     res.json({success:true,last_seen:setLast_Seen.last_seen})
   }catch(err){

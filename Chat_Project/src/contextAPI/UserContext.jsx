@@ -16,13 +16,14 @@ export function UserContextProvider({ children }) {
     }
   }, [user]);
 
-  const clearUserId = () => {
+  const clearUser = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     setUser(null);
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, clearUserId }}>
+    <UserContext.Provider value={{ user, setUser, clearUser }}>
       {children}
     </UserContext.Provider>
   );

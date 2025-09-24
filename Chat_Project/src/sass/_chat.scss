@@ -1,4 +1,5 @@
 @use 'variables';
+@use 'utilities';
 
 .chat-container{
     display:flex;
@@ -50,6 +51,26 @@
                 &::before{
                   background-color: #374248;
                   border-radius: 50%;
+                  font-size: 1.6rem;
+                  padding: 1rem;
+                }
+                }
+
+                &.fa-request{
+                  margin-top: 1rem;
+                  position: relative;
+                  left: -8px;
+                  .count{
+                    font-size: 1rem;
+                    padding: 0.2rem 0.5rem;
+                    border-radius: 1rem;
+                    background-color: variables.$notification-color;
+                    position: absolute;
+                    color: variables.$dark-color;
+                    top: -.5rem;
+                    right: -22px;
+                  }
+                &::before{
                   font-size: 1.6rem;
                   padding: 1rem;
                 }
@@ -274,8 +295,8 @@
                         }
 
                         .chat__avatar{
-                            width: 5.5rem;
-                            height:6rem;
+                            width: 6.5rem;
+                            height: 6.5rem;
                             border-radius: 50%;
                             flex-shrink: 0;
                             padding: .8rem;
@@ -367,6 +388,51 @@
 
                 }
             }
+            .dropdown {
+            position: relative;
+            display: inline-block;
+
+            .dropdown-trigger {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.2rem;
+            cursor: pointer;
+
+            &:hover {
+              color: #fff;
+            }
+      }
+
+  .dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: 2rem;
+    width: 20rem;
+    background: #1c1c1c;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0.5rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+
+    button {
+      background: none;
+      border: none;
+      color: #ff5555;
+      font-weight: bold;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      font-size: 1.4rem;
+      &:hover {
+        background: #2a2a2a;
+      }
+    }
+  }
+}
+
 
         }
         &__panel{
@@ -585,7 +651,7 @@
   color: #fff;
   border: none;
   border-radius: 20px;
-  padding: 6px 12px;
+  padding: .7rem 1.2rem;
   cursor: pointer;
   font-size: 14px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
@@ -593,16 +659,224 @@
   }
 
     }
-    .option2{
-        background-color: variables.$settings-backend;
-        width: 30.53%;
-        display: flex;
-        flex-direction: column;
-        height: 100%; /* kapsayıcı yüksekliği */
-        &:last-child {
-          border-bottom: none;
-        }
+   
+  .friend-requests {
+  background-color: variables.$settings-backend;
+  width: 30.53%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  color: variables.$light-color;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  h2, h3 {
+    color: variables.$light-color;
+    margin-bottom: 0.5rem;
+  }
+
+  .friend-send {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid variables.$next-backend;
+      border-radius: 6px;
+      background: variables.$next-backend;
+      color: variables.$light-color;
     }
+
+    button {
+      @extend .btn;
+      @extend .btn--primary;
+      padding: .3rem .4rem;
+    }
+  }
+
+  .friend-requests__list,
+  .friends__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    .request-item,
+    .friend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: variables.$next-backend;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: lighten(variables.$next-backend, 5%);
+      }
+
+      .left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+
+        img {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          object-fit: cover;
+        }
+
+        .meta {
+          display: flex;
+          flex-direction: column;
+
+          .name {
+            font-weight: 600;
+            font-size: 1.8rem;
+          }
+
+          .about {
+            font-size: 1.6rem;
+            color: variables.$medium-color;
+          }
+
+          .phone {
+            font-size: 1.4rem;
+            color: variables.$accent;
+          }
+        }
+      }
+
+      .right {
+        display: flex;
+        gap: 1rem;
+
+        button {
+          @extend .btn;
+          font-size: 1.4rem;
+          padding: 0.4rem 0.8rem;
+        }
+
+        .accept-btn {
+          @extend .btn--success;
+        }
+
+        .decline-btn {
+          @extend .btn--danger;
+        }
+      }
+    }
+
+    .empty {
+      text-align: center;
+      padding: 0.75rem;
+      font-size: 0.9rem;
+      color: variables.$medium-color;
+    }
+  }
+
+  // 📱 Mobile optimizasyon
+  @media (max-width: 600px) {
+    width: 100%;
+
+    .friend-send {
+      flex-direction: column;
+    }
+
+    .request-item,
+    .friend-item {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .right {
+        margin-top: 0.5rem;
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+  }
+}
+
+/* 🌈 Genel buton stilleri */
+.btn {
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  border-radius: 4px;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+
+  &--primary {
+    background: variables.$accent;
+    color: #fff;
+
+    &:hover {
+      background: lighten(variables.$accent, 5%);
+    }
+  }
+
+  &--success {
+    background: #2ecc71;
+    color: #fff;
+
+    &:hover {
+      background: darken(#2ecc71, 7%);
+    }
+  }
+
+  &--danger {
+    background: #e74c3c;
+    color: #fff;
+
+    &:hover {
+      background: darken(#e74c3c, 7%);
+    }
+  }
+}
+
+.context-menu {
+  position: absolute;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px 14px;
+  z-index: 1000;
+  color: white;
+  cursor: pointer;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: -10px;   // menünün üstünden taşır
+    left: 12px;   // sol üstten biraz içeriden çıkış
+    width: 0;
+    height: 0;
+
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 12px solid #2a2a2a;
+
+    // işaretçiye border ekle (menüyle aynı renk)
+    filter: drop-shadow(0 -1px 0 #444);
+  }
+
+  &:hover {
+    background: lighten(#2a2a2a, 5%);
+  }
+}
+
+
+
+
+
 
     .option3{
         background-color: variables.$settings-backend;
@@ -1342,8 +1616,8 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   top: -100px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #ffcc00;
-  color: black;
+  background-color: variables.$secondary-color;
+  color: #ffcc00;
   padding: 10px 20px;
   border-radius: 8px;
   font-weight: bold;
@@ -1681,3 +1955,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 .bg-close-btn:hover {
   opacity: 0.8;
 }
+
+
+
+

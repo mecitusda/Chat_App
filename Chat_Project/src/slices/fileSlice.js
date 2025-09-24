@@ -1,5 +1,5 @@
 // slices/filesSlice.js
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, current} from "@reduxjs/toolkit";
 
 const initialState = {
   // byKey[conversationId] = Array<{ media_key, media_url?, expiresAt?, type?, ... }>
@@ -30,23 +30,27 @@ const filesSlice = createSlice({
 
     // 👇 En güvenlisi: sadece gelenleri upsert et (override ETME)
     upsertFiles(state, action) {
-      const { conversationId, files } = action.payload;
-      const prev = state.byKey[conversationId] || [];
-      state.byKey[conversationId] = mergeFilesByKey(prev, files || []);
-    },
+  const { conversationId, files } = action.payload;
+  if (!current(state).byKey[conversationId]) {
+    state.byKey[conversationId] = {};
+  }
 
-    // Tek dosya upsert
-    upsertFile(state, action) {
-      const { conversationId, file } = action.payload; // { media_key, ... }
-      const prev = state.byKey[conversationId] || [];
-      state.byKey[conversationId] = mergeFilesByKey(prev, [file]);
-    },
+
+  // Her bir messageId için merge et
+  Object.entries(files).forEach(([msgId, file]) => {
+    state.byKey[conversationId][msgId] = {
+      ...state.byKey[conversationId][msgId], // önceki varsa koru
+      ...file, // yenisiyle güncelle
+    };
+  });
+},
+
 
     // Belirli media_key'leri sil
     removeFiles(state, action) {
       const { conversationId, mediaKeys } = action.payload; // string[]
       const prev = state.byKey[conversationId] || [];
-      state.byKey[conversationId] = prev.filter(f => !mediaKeys.includes(f.media_key));
+      state.byKey[conversationId] = prev.filter(f => !mediaKeys.includes(f.media_url));
     },
 
     // Konuşmanın tüm dosyalarını sil
@@ -72,7 +76,6 @@ const filesSlice = createSlice({
 export const {
   setFiles,
   upsertFiles,
-  upsertFile,
   removeFiles,
   clearConversationFiles,
   purgeExpired,

@@ -104,15 +104,19 @@ export default function ProfileDrawer({
                   Medya
                 </div>
                 <div className="profile-drawer__media-grid">
-                  {mediaThumbs.map((src, i) => (
+                  {mediaThumbs.map((m, i) => (
                     <button
-                      key={`${src}_${i}`}
+                      key={`${m.src}_${i}`}
                       type="button"
                       className="media-item -as-btn"
-                      onClick={() => openBySrc(src)} // GLOBAL LIGHTBOX
+                      onClick={() => openBySrc(m.src)} // GLOBAL LIGHTBOX
                       aria-label="Medyayı aç"
                     >
-                      <img src={src} alt={`media-${i}`} />
+                      {m.type === "video" ? (
+                        <video src={m.src} muted playsInline />
+                      ) : (
+                        <img src={m.src} alt={`media-${i}`} />
+                      )}
                     </button>
                   ))}
                   <button
@@ -129,21 +133,21 @@ export default function ProfileDrawer({
                 {/* ENGELLE / ŞİKAYET / SİL — ALT ALTA */}
                 <div className="profile-drawer__stack">
                   <button
-                    className="profile-drawer__btn -danger"
+                    className="profile-drawer__btn -danger disabled-tip"
                     onClick={onBlock}
                   >
                     <i className="fa-solid fa-ban" />
                     Engelle
                   </button>
                   <button
-                    className="profile-drawer__btn -outline"
+                    className="profile-drawer__btn -outline  disabled-tip"
                     onClick={onReport}
                   >
                     <i className="fa-regular fa-flag" />
                     Şikayet et
                   </button>
                   <button
-                    className="profile-drawer__btn -danger"
+                    className="profile-drawer__btn -danger disabled-tip"
                     onClick={onDeleteChat}
                   >
                     <i className="fa-solid fa-trash-can" />

@@ -145,9 +145,9 @@ function getHeaderAvatarKey(conversation, selfId) {
     const other = meFirst
       ? conversation?.members?.[1]?.user
       : conversation?.members?.[0]?.user;
-    return other?.avatar; // media_key
+    return other?.avatar?.url; // media_key
   }
-  return conversation?.avatar; // group media_key
+  return conversation?.avatar.url; // group media_key
 }
 
 const ChatPanel = ({
@@ -491,20 +491,23 @@ const ChatPanel = ({
 
   /* ------ Mesaj içinde medya render ------ */
   const renderMessageMedia = (m) => {
-    const mediaUrl = fileS?.[convId]?.find(
-      (f) => f.media_key === m.media_key
-    )?.media_url;
+    const file = fileS?.[convId]?.[m._id];
+    const mediaUrl = file?.media_url;
+
     if (!mediaUrl) return null;
 
     const mediaType = classifyType({
       msgType: m.type,
-      mime: m.mime,
+      mime: m.mimetype,
       url: mediaUrl,
     });
+
     const stickIfBottom = () => {
-      if (wasAtBottomRef.current)
+      if (wasAtBottomRef.current) {
         endRef.current?.scrollIntoView({ block: "end" });
+      }
     };
+
     if (mediaType === "image") {
       return (
         <span
@@ -516,11 +519,11 @@ const ChatPanel = ({
             alt="media"
             className="message__media"
             onLoad={stickIfBottom}
-            onLoadedMetadata={stickIfBottom}
           />
         </span>
       );
     }
+
     if (mediaType === "video") {
       return (
         <button
@@ -535,14 +538,13 @@ const ChatPanel = ({
             muted
             preload="metadata"
             playsInline
-            onLoadedMetadata={() => {
-              if (isAtBottom) endRef.current?.scrollIntoView({ block: "end" });
-            }}
+            onLoadedMetadata={stickIfBottom}
           />
           <span className="message__video-play">▶︎</span>
         </button>
       );
     }
+
     if (mediaType === "audio") {
       return (
         <div className="message__media--audio">
@@ -551,6 +553,7 @@ const ChatPanel = ({
       );
     }
 
+    // diğer dosya tipleri
     const name = m.file_name || filenameFromUrl(mediaUrl);
     return (
       <div className="message__file">
@@ -584,25 +587,30 @@ const ChatPanel = ({
 
   const galleryItems = React.useMemo(() => {
     if (!convId) return [];
+
     return (convMessages || [])
       .map((m) => {
-        const mediaUrl = fileS?.[convId]?.find(
-          (f) => f.media_key === m.media_key
-        )?.media_url;
-        if (!mediaUrl || m.type === "text") return null;
+        if (m.type === "text" || !m._id) return null;
+
+        // fileS store’dan messageId ile media_url al
+        const file = fileS?.[convId]?.[m._id];
+        if (!file?.media_url) return null;
+
         const mediaType = classifyType({
           msgType: m.type,
-          mime: m.mime,
-          url: mediaUrl,
+          mime: m.mimetype,
+          url: file.media_url,
         });
+
         if (mediaType === "image" || mediaType === "video") {
           return {
-            src: mediaUrl,
+            src: file.media_url,
             type: mediaType,
             alt: "media",
             caption: m.text || "",
           };
         }
+
         return null;
       })
       .filter(Boolean);
@@ -655,13 +663,11 @@ const ChatPanel = ({
     return firstUnseenIndex >= 0 ? firstUnseenIndex : null;
   }, [activeConversation?._id, fetchingNew]);
 
-  const headerAvatarKey = React.useMemo(
+  const headerAvatarUrl = React.useMemo(
     () => getHeaderAvatarKey(activeConversation, userId),
     [activeConversation, userId]
   );
 
-  // 2) hook’u TEK yerde çağır
-  const headerAvatarUrl = useMediaUrl(headerAvatarKey);
   /* Odayı izle */
   return (
     <div className="chat__panel">
@@ -677,9 +683,7 @@ const ChatPanel = ({
             }
             onOpenProfile={() => setProfileOpen(true)}
             activeConversation={activeConversation}
-            avatar={
-              headerAvatarUrl || "https://avatar.iran.liara.run/public/49"
-            }
+            avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
             userId={userId}
           />
 
@@ -689,8 +693,7 @@ const ChatPanel = ({
             conversation={activeConversation}
             meId={userId}
             mediaThumbs={galleryItems
-              .filter((i) => i.type === "image")
-              .map((i) => i.src)
+              .filter((i) => i.type === "image" || i.type === "video")
               .slice(0, 9)}
             allMedia={galleryItems} // [{src,type,alt}]
             onOpenLightbox={(start) => {
@@ -701,9 +704,7 @@ const ChatPanel = ({
             onBlock={() => console.log("Engelle")}
             onReport={() => console.log("Şikayet et")}
             onDeleteChat={() => console.log("Sohbeti sil")}
-            avatar={
-              headerAvatarUrl || "https://avatar.iran.liara.run/public/49"
-            }
+            avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
           />
         </>
       )}
@@ -749,7 +750,7 @@ const ChatPanel = ({
         )}
         {convMessages.map((msg, index) => {
           const isMe = (msg?.sender?._id || msg?.sender) === userId;
-          const hasMedia = msg.type !== "text" && msg.media_key;
+          const hasMedia = msg.type !== "text" && msg.media_url;
           //console.log(unreadDividerIndex);
           return (
             <React.Fragment key={msg._id || index}>
@@ -849,21 +850,27 @@ const ChatPanel = ({
             })
           );
           if (serverMsg.type !== "text") {
-            const a = [serverMsg].map((item) => ({
-              media_key: item.media_key,
-            }));
+            const files = [serverMsg].reduce((acc, item) => {
+              if (!item?._id) return acc;
+              acc[item._id] = {
+                media_url: item.media_url,
+                media_url_expiresAt: item.media_url_expiresAt,
+              };
+              return acc;
+            }, {});
+
             dispatch(
               upsertFiles({
-                conversationId: convId,
-                files: a,
+                conversationId: serverMsg.conversation,
+                files: files,
               })
             );
           }
         }}
-        onAckStatus={(tempId, status) => {
+        onAckStatus={(conversationId, tempId, status) => {
           dispatch(
             applyMessageAck({
-              conversationId: convId,
+              conversationId: conversationId,
               messageId: tempId,
               status,
             })

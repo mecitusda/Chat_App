@@ -186,7 +186,7 @@ export default function ChatInput({
         },
         (ack) => {
           if (!ack || ack.success === false) {
-            onAckStatus?.(tempId, "failed");
+            onAckStatus?.(conversationId, tempId, "failed");
             setSending(false);
             return;
           }

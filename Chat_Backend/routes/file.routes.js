@@ -3,6 +3,9 @@ import s3 from "../config/s3.js"; // senin config dosyan
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import dotenv from "dotenv";
+import Message from "../models/Message.js"
+import Conversation from "../models/Conversation.js";
+import User from "../models/Users.js"
 dotenv.config();
 const router = express.Router();
 
@@ -40,7 +43,7 @@ const fType = (data) => {
 router.get("/presigned-url/profile", async (req, res) => {
   try {
     const { user_id , fileType } = req.query;
-    console.log({ user_id , fileType })
+    //console.log({ user_id , fileType })
     if (!user_id || !fileType) {
       return res.status(400).json({ error: "Eksik parametre" });
     }
@@ -90,7 +93,6 @@ router.get("/presigned-url/message", async (req, res) => {
     if (!conversationId || !fileType) {
       return res.status(400).json({ error: "Eksik parametre" });
     }
-    console.log("buraya girdi.")
     const key = `conversations/${conversationId}/${fType(fileType)}/${generateUniqueFilename()}.${fileType.split("/")[1]}`;
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -116,7 +118,7 @@ router.get("/presigned-url/file", async (req, res) => {//bu routera yetki koyuca
     Key: `${mediaKey}`,
   });
   try{
-     const url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 saat geçerli
+     const url = await getSignedUrl(s3, command, { expiresIn: 86400 }); // 1 saat geçerli
   return res.json({ url });
   }catch(error){
     console.error(error);
@@ -140,8 +142,8 @@ router.get("/presigned-url/background", async (req, res) => {
   });
 
   try {
-    const uploadURL = await getSignedUrl(s3, command, { expiresIn: 60 * 5 }); // 5 dakika geçerli
-    console.log("girdi döndü: ",{ uploadURL, mediaKey })
+    const uploadURL = await getSignedUrl(s3, command, { expiresIn: 60 * 5  }); // 5 dakika geçerli
+    //console.log("girdi döndü: ",{ uploadURL, mediaKey })
     res.json({ uploadURL, mediaKey });
   } catch (err) {
     console.error("Presigned URL hatası:", err);
@@ -151,101 +153,122 @@ router.get("/presigned-url/background", async (req, res) => {
 
 // POST 
 
+
+
 router.post("/presigned-url/avatars", async (req, res) => {
-  const { avatars } = req.body; 
-   console.log("5")
-  // avatars = [{ media_key, type, ownerUserId, sourceConvId }, ...]
-  console.log(avatars)
-  if (!Array.isArray(avatars) || avatars.length === 0) {
-    return res.status(400).json({ error: "avatars boş olamaz" });
-  }
-
   try {
-    const urls = await Promise.all(
-      avatars.map(async (avatar) => {
-        const command = new GetObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: avatar.media_key,
-        });
-        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const { expiredAvatars } = req.body; // [{conversationId, type}, {userId, conversationId, type}]
+    const results = [];
 
-        return {
-          ...avatar, // media_key, type, ownerUserId, sourceConvId
-          media_url: url, // yeni eklenen alan
-        };
-      })
-    );
+    for (const item of expiredAvatars) {
+      if (item.type === "conversation") {
+        const conv = await Conversation.findById(item.conversationId).select("avatar");
+        if (conv?.avatar?.key) {
+          const command = new GetObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: conv.avatar.key,
+          });
+          const url = await getSignedUrl(s3, command, { expiresIn: 86400});
+          results.push({
+            type: "conversation",
+            conversationId: item.conversationId,
+            avatar: { url, url_expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+          });
+        }
+      }
 
-    // conversationId'ye göre grupla
-    const grouped = {};
-    urls.forEach((item) => {
-      const convId = item.sourceConvId || item.ownerConvId;
-      if (!convId) return; // safety
-      if (!grouped[convId]) grouped[convId] = [];
-      grouped[convId].push(item);
-    });
+      if (item.type === "user") {
+        const u = await User.findById(item.userId).select("avatar");
+        if (u?.avatar?.key) {
+          const command = new GetObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: u.avatar.key,
+          });
+          const url = await getSignedUrl(s3, command, { expiresIn: 86400 });
+          results.push({
+            type: "user",
+            conversationId: item.conversationId,
+            userId: item.userId,
+            avatar: { url, url_expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+          });
+        }
+      }
+    }
 
-    return res.json(grouped);
-  } catch (error) {
-    console.error("Avatar presigned hatası:", error);
-    return res.status(500).json({ error: "Avatar URL'leri alınamadı" });
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error("❌ /presigned-url/avatars error:", err);
+    res.status(500).json({ success: false, error: "Avatar presigned alınamadı" });
   }
 });
 
-router.post("/presigned-url/bgImages", async (req, res) => {
-  const { backgrounds } = req.body; 
-  if (!Array.isArray(backgrounds) || backgrounds.length === 0) {
-    return res.status(400).json({ error: "backgrounds boş olamaz" });
-  }
+// router.post("/presigned-url/bgImages", async (req, res) => {
+//   const { backgrounds } = req.body; 
+//   if (!Array.isArray(backgrounds) || backgrounds.length === 0) {
+//     return res.status(400).json({ error: "backgrounds boş olamaz" });
+//   }
 
+//   try {
+//     const urls = await Promise.all(
+//       backgrounds.map(async (bg) => {
+//         const command = new GetObjectCommand({
+//           Bucket: process.env.AWS_BUCKET_NAME,
+//           Key: bg.media_key,
+//         });
+//         const url = await getSignedUrl(s3, command, { expiresIn: 86400 });
+
+//         return {
+//           ...bg,
+//           media_url: url,
+//         };
+//       })
+//     );
+
+//     return res.json(urls);
+//   } catch (error) {
+//     console.error("bgImage presigned hatası:", error);
+//     return res.status(500).json({ error: "bgImage URL'leri alınamadı" });
+//   }
+// });
+
+
+
+router.post("/presigned-url/files", async (req, res) => {
+  const { messageIds } = req.body;
+  if (!Array.isArray(messageIds) || messageIds.length === 0) {
+    return res.status(400).json({ error: "messageIds gerekli" });
+  }
+  console.log("messageıds: ",messageIds)
   try {
+    // 1) DB'den mesajları bul
+    const messages = await Message.find({ _id: { $in: messageIds } });
+
+    // 2) Presigned URL üret
     const urls = await Promise.all(
-      backgrounds.map(async (bg) => {
+      messages.map(async (msg) => {
+        if (!msg.media_key) {
+          return { messageId: msg._id, media_url: null };
+        }
+
         const command = new GetObjectCommand({
           Bucket: process.env.AWS_BUCKET_NAME,
-          Key: bg.media_key,
+          Key: msg.media_key,
         });
-        const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
 
-        return {
-          ...bg,
-          media_url: url,
-        };
+        const url = await getSignedUrl(s3, command, { expiresIn: 86400 }); // 10 dk
+
+        // 3) DB'yi güncelle (isteğe bağlı)
+        msg.media_url = url;
+        msg.media_url_expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await msg.save();
+
+        return { messageId: msg._id, media_url: url };
       })
     );
 
     return res.json(urls);
   } catch (error) {
-    console.error("bgImage presigned hatası:", error);
-    return res.status(500).json({ error: "bgImage URL'leri alınamadı" });
-  }
-});
-
-
-
-router.post("/presigned-url/files", async (req, res) => {//bu routera yetki koyucazki herkes alamasın signature.hepsine koyulcak ama bu öncelikli
-   console.log("6")
-  const {mediaKeys} = req.body;
-  try{
-    console.log("mediaKeys: ",mediaKeys)
-    const urls = await Promise.all(
-  mediaKeys.map(async (media_key) => {
-    console.log(media_key)
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: media_key,
-    });
-  
-    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-
-    return { media_key, media_url:url };
-  })
-
-);
-
-  return res.json(urls);
-  }catch(error){
-    console.error(error);
+    console.error("presigned-url/files error:", error);
     return res.status(500).json({ error: "URL alınamadı" });
   }
 });

@@ -31,10 +31,20 @@ html{
 }
 
 body{
-    background-color: variables.$secondary-color;
+    background-color: variables.$settings-backend;
     font-family: "Segoe UI", Helvetica, sans-serif;
     line-height: 1.5;
     font-size: 1.6rem;
+    height: 100vh;
+}
+
+main{
+  height: 100vh;
+  width: 100vw;
+  min-height: 100vh; /* tüm ekran */
+  display: flex;
+  justify-content: center; /* yatay */
+  align-items: center;     /* dikey */
 }
 
 a{
@@ -64,4 +74,75 @@ img{
     font-size: .6rem;
   }
 
+}
+
+
+/* Tooltip sarmalayıcı */
+.disabled-tip {
+  position: relative;
+  display: inline-flex;           /* boyutu elemana uysun */
+  cursor: not-allowed;            /* “kullanılamaz” hissi */
+  --tip-bg: rgba(20,20,20,.95);
+  --tip-fg: #fff;
+  --tip-pad: .55rem .7rem;
+  --tip-radius: .5rem;
+  --tip-gap: .5rem;               /* hedef ile tooltip arası */
+  --tip-fs: .95rem;
+}
+
+/* Tooltip kutusu */
+.disabled-tip::after {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--tip-gap));
+  transform: translate(-50%, 4px);
+  background: var(--tip-bg);
+  color: var(--tip-fg);
+  padding: var(--tip-pad);
+  border-radius: var(--tip-radius);
+  font-size: var(--tip-fs);
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility .15s;
+  z-index: 1000;
+  content: attr(data-tip);        /* varsa data-tip kullanılır */
+}
+
+/* data-tip yoksa default metin */
+.disabled-tip:not([data-tip])::after {
+  content: "Şu an kullanılamıyor";
+}
+
+/* Küçük ok */
+.disabled-tip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--tip-gap) - 6px);
+  transform: translateX(-50%) scale(0.9);
+  border: 6px solid transparent;
+  border-top-color: var(--tip-bg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .15s ease, transform .15s ease, visibility .15s;
+  z-index: 999;
+}
+
+/* Hover veya klavye odağında göster */
+.disabled-tip:hover::after,
+.disabled-tip:focus-within::after,
+.disabled-tip:hover::before,
+.disabled-tip:focus-within::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+/* İçindeki gerçek eleman devre dışı da olsa (button disabled) tooltip çalışsın */
+.disabled-tip > * {
+  pointer-events: none;           /* tıklama sarıcıda kalsın */
 }

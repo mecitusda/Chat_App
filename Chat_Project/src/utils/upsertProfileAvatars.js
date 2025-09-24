@@ -8,6 +8,7 @@ import { groupBy } from "../helpers/groupBy";
  * - Aynı kullanıcıyı aynı konuşmada birden fazla kez eklemez (per-conv uniq).
  */
 export function upsertProfileAvatars(list, selfId, dispatch, getState) {
+  return;
   if (!Array.isArray(list) || list.length === 0) return;
 
   const candidates = [];          // eklenecek yeni kayıtlar (upsert)

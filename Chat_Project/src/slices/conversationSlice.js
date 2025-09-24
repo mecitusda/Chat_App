@@ -197,19 +197,46 @@
         const arr = action.payload || [];
         state.list = upsertConversations([], arr);
       },
+      updateConversationAvatars(state, action) {
+      const updates = action.payload;
+      console.log(updates)
+      updates.forEach((u) => {
+    const avatarObj = u.avatar;
+    const avatar = avatarObj
+      ? { url: avatarObj.url, url_expiresAt: avatarObj.url_expiresAt }
+      : null;
+
+    if (u.type === "conversation") {
+      const conv = state.list.find((c) => String(c._id) === String(u.conversationId));
+      if (conv && avatar) conv.avatar = avatar;
+    }
+
+    if (u.type === "user") {
+      console.log("user: ",u)
+      const conv = state.list.find((c) => String(c._id) === String(u.conversationId));
+      if (conv) {
+        const member = conv.members.find((m) => String(m.user._id) === String(u.userId));
+        if (member && avatar) member.user.avatar = avatar;
+      }
+    }
+  });
+},
+ 
 
       // Tek tek veya dizi halinde upsert
       // addOrUpdateConversations(state, action) {
       //   const incoming = action.payload; // tek conv veya [conv]
       //   state.list = upsertConversations(state.list, incoming);
       // },
-    addOrUpdateConversations(state, action) {
+      addOrUpdateConversations(state, action) {
       const updates = Array.isArray(action.payload)
         ? action.payload
         : [action.payload];
 
       if (updates.length === 0) return;
+  
       updates.forEach(update => {
+            
         const convId = update._id;
         const idx = state.list.findIndex(c => String(c._id) === String(convId));
       if (idx >= 0) {
@@ -238,7 +265,7 @@
       state.list = sortConversations(state.list); 
       });
       
-    },
+      },
 
       // Sadece belirli alanları patch'le (isim, avatar vs.)
       patchConversation(state, action) {
@@ -334,7 +361,8 @@
     resetUnread,
     removeConversation,
     resetConversation,
-    updatedLastReadId
+    updatedLastReadId,
+    updateConversationAvatars
   } = conversationsSlice.actions;
 
   export default conversationsSlice.reducer;
