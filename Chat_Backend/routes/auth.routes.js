@@ -9,7 +9,7 @@ dotenv.config();
 const router = express.Router();
 import sendMail from "../config/mailSender.js"
 import {mongoose} from "mongoose"
-import redisClient from "../utils/redis.js"
+
 import {authMiddleware } from "../middleware/auth.js"
 // Register
 router.post("/register", async (req, res) => {

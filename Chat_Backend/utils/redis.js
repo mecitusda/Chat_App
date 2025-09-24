@@ -1,12 +1,12 @@
-// utils/redis.js
-import { createClient } from "redis";
+import { createClient } from "redis"
 
-const redisClient = createClient({
-  url: process.env.REDIS_URL || "redis://127.0.0.1:6379",
+const client = createClient({
+  url: process.env.REDIS_URL
 });
 
-redisClient.on("error", (err) => console.error("Redis error:", err));
+client.on("error", function(err) {
+  throw err;
+});
+await client.connect()
 
-await redisClient.connect();
-
-export default redisClient;
+export default client;

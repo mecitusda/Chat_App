@@ -4,8 +4,10 @@ import {Server} from "socket.io";
 import dotenv from "dotenv";
 import axios from "axios";
 import Redis from "ioredis";
+dotenv.config();
 
 const redis = new Redis(process.env.REDIS_URL); 
+
 // örn: redis://localhost:6379
 
 async function setLastSeen(userId, timestamp) {
@@ -17,7 +19,7 @@ async function getLastSeen(userId) {
   return ts ? Number(ts) : null;
 }
 
-dotenv.config();
+
 
 const PORT = process.env.SOCKET_PORT || 3500;
 const BACKEND_URL = process.env.BACKEND_URL;
@@ -52,7 +54,6 @@ const typingTimers = new Map();
 
 // Helpers
 async function emitPresence(userId, online) {
-  console.log("last seen: ",await getLastSeen(userId))
   const payload = { userId, online, lastSeen: online ? undefined : await getLastSeen(userId) || Date.now() };
   io.to(`presence:user:${userId}`).emit("presence:update", payload);
 }
@@ -383,12 +384,12 @@ io.on("connection", (socket) => {
   });
 
   // İstemci “şu kullanıcıların anlık durumunu” sorar
-  socket.on("presence:who", ({ userIds = [] } = {}, cb) => {
+  socket.on("presence:who", async ({ userIds = [] } = {}, cb) => {
     const res = {};
     for (const uid0 of userIds) {
       const uid = String(uid0);
       const online = socketsByUser.get(uid)?.size > 0;
-      res[uid] = { online, lastSeen: online ? undefined : (getLastSeen(uid) || null) };
+      res[uid] = { online, lastSeen: online ? undefined : (await getLastSeen(uid) || null) };
     }
     cb?.(res);
   });

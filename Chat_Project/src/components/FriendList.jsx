@@ -66,7 +66,7 @@ export default function FriendsList({
           >
             <div className="left">
               <img
-                src={f?.avatar?.url || "https://avatar.iran.liara.run/public/2"}
+                src={f?.avatar?.url || "/images/default-avatar.jpg"}
                 alt=""
                 width={36}
                 height={36}
