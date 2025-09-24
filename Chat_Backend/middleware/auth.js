@@ -1,6 +1,6 @@
 // middleware/auth.js
 import jwt from "jsonwebtoken";
-import client from "../utils/redis.js";
+import {client} from "../utils/redis.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {

@@ -6,7 +6,7 @@ import User from "../models/Users.js";
 import dotenv from "dotenv";
 import crypto from "crypto";
 dotenv.config();
-import client from "../utils/redis.js"
+import {client} from "../utils/redis.js"
 const router = express.Router();
 import sendMail from "../config/mailSender.js"
 import {mongoose} from "mongoose"

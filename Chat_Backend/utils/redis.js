@@ -1,12 +1,18 @@
-import { createClient } from "redis"
+import { createClient } from "redis";
 
 const client = createClient({
-  url: process.env.REDIS_URL
+  url: process.env.REDIS_URL,
+  socket: {
+    connectTimeout: 10000, // 10s
+  }
 });
 
-client.on("error", function(err) {
-  throw err;
-});
-await client.connect()
+client.on("error", (err) => console.error("Redis Client Error", err));
 
-export default client;
+async function initRedis() {
+  if (!client.isOpen) {
+    await client.connect();
+  }
+}
+
+export { client, initRedis };
