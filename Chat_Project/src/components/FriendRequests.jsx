@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useUser } from "../contextAPI/UserContext";
 import { useFriends } from "../hooks/useFriends";
-import FriendList from "./friendList";
+import FriendList from "./FriendList";
 import { addFriend, removeRequest } from "../slices/friendSlice";
 
 export default function FriendRequests({ socket, showNotification }) {
