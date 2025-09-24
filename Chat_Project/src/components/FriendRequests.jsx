@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useUser } from "../contextAPI/UserContext";
 import { useFriends } from "../hooks/useFriends";
-import FriendsList from "./friendList";
+import FriendList from "./friendList";
 import { addFriend, removeRequest } from "../slices/friendSlice";
 
 export default function FriendRequests({ socket, showNotification }) {
@@ -119,7 +119,7 @@ export default function FriendRequests({ socket, showNotification }) {
         )}
       </div>
 
-      <FriendsList
+      <FriendList
         socket={socket}
         onOpenProfile={(friend) => {
           // burada modal açabilirsin veya başka sayfaya yönlendirebilirsin
