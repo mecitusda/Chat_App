@@ -86,8 +86,12 @@ const ChatPanel_Header = ({
         <span className="chat__header-status">{statusText}</span>
       </div>
       <div className="chat__header-options">
-        <button className="chat__header-option fa-solid fa-ellipsis-vertical"></button>
-        <button className="chat__header-option fa-solid fa-magnifying-glass"></button>
+        <div className="disabled-tip">
+          <button className="chat__header-option fa-solid fa-ellipsis-vertical"></button>
+        </div>
+        <div className="disabled-tip">
+          <button className="chat__header-option fa-solid fa-magnifying-glass"></button>
+        </div>
       </div>
     </div>
   );
