@@ -1,6 +1,6 @@
 // middleware/auth.js
 import jwt from "jsonwebtoken";
-import redisClient from "../utils/redis.js";
+import client from "../utils/redis.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -10,7 +10,7 @@ export const authMiddleware = async (req, res, next) => {
     if (!token) return res.status(401).json({ success: false, message: "Yetkisiz erişim" });
 
     // Blacklist kontrolü
-    const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+    const isBlacklisted = await client.get(`blacklist:${token}`);
     if (isBlacklisted) {
       return res.status(401).json({ success: false, message: "Token geçersiz (çıkış yapılmış)" });
     }

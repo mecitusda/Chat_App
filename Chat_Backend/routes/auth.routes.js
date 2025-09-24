@@ -6,7 +6,7 @@ import User from "../models/Users.js";
 import dotenv from "dotenv";
 import crypto from "crypto";
 dotenv.config();
-import redisClient from "../utils/redis.js"
+import client from "../utils/redis.js"
 const router = express.Router();
 import sendMail from "../config/mailSender.js"
 import {mongoose} from "mongoose"
@@ -211,8 +211,7 @@ router.post("/logout", async (req, res) => {
     // Token expire süresine kadar blacklist’te tut
     const ttl = decoded.exp - Math.floor(Date.now() / 1000);
 
-    await redisClient.setEx(`blacklist:${token}`, ttl, "true");
-
+    await client.setEx(`blacklist:${token}`, ttl, "true");
     return res.json({ success: true, message: "Çıkış yapıldı" });
   } catch (err) {
     console.error("Logout error:", err);
