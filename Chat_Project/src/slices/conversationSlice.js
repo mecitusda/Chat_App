@@ -15,7 +15,7 @@
   function idOfMember(m) {
     // m.user bir object ise _id'yi, string ise kendisini kullan
     return String(typeof m.user === "object" ? (m.user?._id || m.user?.id) : m.user);
-  }
+  };
 
   function mergeMembers(prevMembers = [], updateMembers) {
     if (!Array.isArray(updateMembers)) return prevMembers; // update.members yoksa dokunma
@@ -71,7 +71,7 @@
     }
     //console.log("sonuç: ",result)
     return result;
-  }
+  };
 
   function mergeConversation(prev, update) {
     // last_message deep merge
@@ -106,41 +106,8 @@
     }
 
     return next;
-  }
-
-
-
-  // function mergeConversation(prev, update) {
-  //   // last_message deep merge
-  //   const nextLast = {
-  //     ...(prev.last_message || {}),
-  //     ...(update.last_message || {}),
-  //     message: {
-  //       ...(prev.last_message?.message || {}),
-  //       ...(update.last_message?.message || {}),
-  //     },
-  //     sender: update.last_message?.sender ?? prev.last_message?.sender,
-  //   };
-
-  //   const next = {
-  //     ...prev,
-  //     ...update,
-  //     last_message: nextLast,
-  //   };
-
-  //   // unread'i asla rastgele sıfırlama!
-  //   // - payload açıkça unread veriyorsa onu kullan
-  //   // - vermiyorsa eski değeri koru
-  //   if (Object.prototype.hasOwnProperty.call(update, "unread")) {
-  //     next.unread = update.unread ?? 0;
-  //   } else {
-  //     next.unread = prev.unread ?? 0;
-  //   }
-
-  //   return next;
-  // }
-
-  // list içinde upsert + sıralama (son aktiviteye göre)
+  };
+  
   function upsertConversations(oldList = [], incoming = []) {
     const arr = Array.isArray(incoming) ? incoming : [incoming];
     const byId = new Map(oldList.map(c => [c._id, c]));
@@ -172,7 +139,7 @@
     // internal alanı temizle (UI'a sızmasın)
     result.forEach(c => { if ('_lastActivity' in c) delete c._lastActivity; });
     return result;
-  }
+  };
 
 
   function convTime(c) {
@@ -183,16 +150,16 @@
       c?.created_at ||
       0
     ).getTime();
-  }
+  };
 
   function sortConversations(list) {
     return list.slice().sort((a, b) => convTime(b) - convTime(a));
-  }
+  };
+
   const conversationsSlice = createSlice({
     name: "conversations",
     initialState,
     reducers: {
-      // İlk yükleme gibi tam listeyi bilerek ezmek istersen
       setConversations(state, action) {
         const arr = action.payload || [];
         state.list = upsertConversations([], arr);
@@ -220,44 +187,23 @@
       }
     }
   });
-},
- 
-
-      // Tek tek veya dizi halinde upsert
-      // addOrUpdateConversations(state, action) {
-      //   const incoming = action.payload; // tek conv veya [conv]
-      //   state.list = upsertConversations(state.list, incoming);
-      // },
-      addOrUpdateConversations(state, action) {
+      },
+      addOrUpdateConversations(state, action) {    
       const updates = Array.isArray(action.payload)
         ? action.payload
         : [action.payload];
-
       if (updates.length === 0) return;
-  
-      updates.forEach(update => {
-            
+        updates.forEach(update => {    
         const convId = update._id;
         const idx = state.list.findIndex(c => String(c._id) === String(convId));
-      if (idx >= 0) {
-        // if(state.list[idx].last_message.message?.text !== update.last_message.message?.text || state.list[idx].last_message.message?.media_key !== update.last_message.message?.media_key){
-        // state.list[idx] = mergeConversation(state.list[idx], update);
-        // //console.log(state.list[idx])
-        // }
-        if(current(state).list[idx] !== update){
-          if(!update.unread){
-            update.unread = current(state).list[idx].unread ?? 0;
-          }
-          state.list[idx] = update
+      if (idx >= 0 && current(state).list[idx] !== update) {
+        if(!update.unread){
+        update.unread = current(state).list[idx].unread ?? 0;
         }
-        // if(current(state).list[idx].members !== update.members){
-        //   state.list[idx].members = update.members
-        // }
+        state.list[idx] = update
       } 
       else if(idx<0){
-        // yoksa ekle
         state.list.unshift(update);
-        
       }
       else{
         return

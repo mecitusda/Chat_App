@@ -157,6 +157,8 @@ const ChatPanel = ({
   socket,
   fetchingNew,
   isOnline,
+  setActiveConversation,
+  setactiveConversationId,
 }) => {
   //console.log("messages: ", messages);
   const { user, setUser } = useUser();
@@ -670,7 +672,7 @@ const ChatPanel = ({
 
   /* Odayı izle */
   return (
-    <div className="chat__panel">
+    <div className={`chat__panel ${activeConversation ? "is-visible" : ""}`}>
       {activeConversation && (
         <>
           <ChatHeader
@@ -685,6 +687,8 @@ const ChatPanel = ({
             activeConversation={activeConversation}
             avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
             userId={userId}
+            setActiveConversation={setActiveConversation}
+            setactiveConversationId={setactiveConversationId}
           />
 
           <ProfileDrawer
@@ -705,6 +709,7 @@ const ChatPanel = ({
             onReport={() => console.log("Şikayet et")}
             onDeleteChat={() => console.log("Sohbeti sil")}
             avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
+            socket={socket}
           />
         </>
       )}
@@ -879,11 +884,15 @@ const ChatPanel = ({
         isOnline={isOnline}
         socket={socket}
         conversationId={activeConversation?._id}
+        conversation={activeConversation}
         userId={userId}
         file={file}
         setFile={setFile}
         filePreviewUrl={filePreviewUrl}
         setFilePreviewUrl={setFilePreviewUrl}
+        activeConversation={activeConversation}
+        setActiveConversation={setActiveConversation}
+        setactiveConversationId={setactiveConversationId}
       />
       {isLightboxOpen && galleryItems.length > 0 && (
         <MediaLightbox

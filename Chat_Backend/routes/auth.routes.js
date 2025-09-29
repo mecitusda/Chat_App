@@ -573,6 +573,7 @@ router.get("/friends/:userId", async (req, res) => {
       if (avatar) f.avatar = avatar;
       friends.push(f);
     }
+    console.log("friends: ",friends)
 
     res.json({ success: true, friends });
   } catch (err) {

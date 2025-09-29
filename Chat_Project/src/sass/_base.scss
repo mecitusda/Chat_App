@@ -27,7 +27,11 @@
 }
 
 html{
-    font-size:62.5%;
+  font-size:62.5%;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* sayfa kaymasın */
 }
 
 body{
@@ -35,18 +39,24 @@ body{
     font-family: "Segoe UI", Helvetica, sans-serif;
     line-height: 1.5;
     font-size: 1.6rem;
-    height: 100vh;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden; /* sayfa kaymasın */
+}
+
+#root{
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* sayfa kaymasın */
 }
 
 main{
-  height: 100vh;
-  width: 100vw;
-  min-height: 100vh; /* tüm ekran */
-  display: flex;
-  justify-content: center; /* yatay */
-  align-items: center;     /* dikey */
+  margin: 0;
+  padding: 0;
+  height: 100%;
 }
-
 a{
     text-decoration: none;
     color: variables.$dark-color;
@@ -63,7 +73,10 @@ img{
 
 @media (max-width: 576px) {
   html{
-    font-size: .52rem;
+  font-size: .52rem;
+  margin: 0;
+  padding: 0;
+  height: 100%;
   }
 
 

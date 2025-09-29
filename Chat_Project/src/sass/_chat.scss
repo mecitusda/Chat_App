@@ -6,100 +6,98 @@
     flex-direction: row;
     flex-wrap: nowrap;
     height: 100vh;  //95 eski datalar.
-    width: 100%;   //85
+    width: 100vw;   //85
     overflow-y: hidden;
     //margin-top: 2.5rem;
     .chat{ 
-        &__options{
-            background-color: variables.$settings-backend;
-            color: rgb(127, 129, 133);
-            max-width: 65px!important;
-            width: 4.06%;
-            border-right: 1px solid #2d3e47;
-            padding: 1rem 1.2rem!important;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            flex-grow: 1;
-            border-radius: 10px 0 0 10px;
-            .__top{
-              display: flex;
-              flex-direction: column;
-              gap: 1.5rem;
-              padding: 1rem 0;
-              margin: 0 auto;
-              
-              button{
-                border: none;
-                background: none;
-                color: variables.$button-color;
-                font-size: 1.6rem;
-                cursor: pointer;
-                &.fa-message{
-                  position: relative;
-                  left: -8px;
-                  .count{
-                    font-size: 1rem;
-                    padding: 0.2rem 0.5rem;
-                    border-radius: 1rem;
-                    background-color: variables.$notification-color;
-                    position: absolute;
-                    color: variables.$dark-color;
-                    top: -12px;
-                    right: -22px;
-                  }
-                &::before{
-                  background-color: #374248;
-                  border-radius: 50%;
-                  font-size: 1.6rem;
-                  padding: 1rem;
-                }
-                }
-
-                &.fa-request{
-                  margin-top: 1rem;
-                  position: relative;
-                  left: -8px;
-                  .count{
-                    font-size: 1rem;
-                    padding: 0.2rem 0.5rem;
-                    border-radius: 1rem;
-                    background-color: variables.$notification-color;
-                    position: absolute;
-                    color: variables.$dark-color;
-                    top: -.5rem;
-                    right: -22px;
-                  }
-                &::before{
-                  font-size: 1.6rem;
-                  padding: 1rem;
-                }
-                }
-              
-              }
-             
-            }
-            .__bottom{
-              display: flex;
-              flex-direction: column;
-              margin: auto auto 0 auto;
-              gap: 1.5rem;
-              .option{
-                margin: 0 auto;
-                .fa-circle-user{
-                font-size: 2.6rem;
-              }
-                button{
-                border: none;
-                background: none;
-                color: variables.$button-color;
-                font-size: 1.6rem;
-                cursor: pointer;
-                }
-              }
-            }
-
-        }
+         &__options{
+             background-color: variables.$settings-backend;
+             color: rgb(127, 129, 133);
+             max-width: 65px;
+             width: 4.06%;
+             border-right: 1px solid #2d3e47;
+             padding: 1rem 1.2rem;
+             display: flex;
+             flex-direction: column;
+             gap: 1rem;
+             flex-grow: 1;
+             border-radius: 10px 0 0 10px;
+             .__top{
+               display: flex;
+               flex-direction: column;
+               gap: 1.5rem;
+               padding: 1rem 0;
+               margin: 0 auto;
+            
+               button{
+                 border: none;
+                 background: none;
+                 color: variables.$button-color;
+                 font-size: 1.6rem;
+                 cursor: pointer;
+                 &.fa-message{
+                   position: relative;
+                   left: -8px;
+                   .count{
+                     font-size: 1rem;
+                     padding: 0.2rem 0.5rem;
+                     border-radius: 1rem;
+                     background-color: variables.$notification-color;
+                     position: absolute;
+                     color: variables.$dark-color;
+                     top: -12px;
+                     right: -22px;
+                   }
+                 &::before{
+                   background-color: #374248;
+                   border-radius: 50%;
+                   font-size: 1.6rem;
+                   padding: 1rem;
+                 }
+                 }
+                 &.fa-request{
+                   margin-top: 1rem;
+                   position: relative;
+                   left: -8px;
+                   .count{
+                     font-size: 1rem;
+                     padding: 0.2rem 0.5rem;
+                     border-radius: 1rem;
+                     background-color: variables.$notification-color;
+                     position: absolute;
+                     color: variables.$dark-color;
+                     top: -.5rem;
+                     right: -22px;
+                   }
+                 &::before{
+                   font-size: 1.6rem;
+                   padding: 1rem;
+                 }
+                 }
+           
+               }
+          
+             }
+             .__bottom{
+               display: flex;
+               flex-direction: column;
+               margin: auto auto 0 auto;
+               gap: 1.5rem;
+               .option{
+                 margin: 0 auto;
+                 .fa-circle-user{
+                 font-size: 2.6rem;
+               }
+                 button{
+                 border: none;
+                 background: none;
+                 color: variables.$button-color;
+                 font-size: 1.6rem;
+                 cursor: pointer;
+                 }
+               }
+             }
+         }
         &__list{
             background-color: variables.$settings-backend;
             width: 30.53%;
@@ -131,7 +129,7 @@
                           background: none;
                           color: variables.$button-color;
                           cursor: pointer;
-                          font-size: 1.5rem;
+                          font-size:1.6rem;
                         }
                         padding: 0 .5rem;
                     }
@@ -157,13 +155,21 @@
                     margin: 0 auto;
                     flex-direction: row;
                     align-items: center;
-                    background-color:#202c33;
+                    background-color:  variables.$border;
                     border-radius: .5rem;
                     height: 3.5rem;
                     box-shadow: inset 0 .1rem .2rem rgba(0, 0, 0, 0.1);
                     transition: background-color 0.2s ease;
+                    border-bottom:2px solid variables.$medium-color;
                     &:focus-within {
-                      background-color: #eaeaea;
+                      
+                      background-color: #202c33;
+                      color: #000;
+                      .bar-icon { color: #00a884;
+                        transform:scale(1.1) translateY(-.1rem)
+                      
+                      }
+                      border-bottom: 3px solid #144D37
                     }
                     .bar-icon{
                         margin-right: .6rem;
@@ -199,15 +205,7 @@
                       @media (min-width: 768px) { display: inline-block; }
                     }
 
-                    &.has-value {
-                      background-color: #202c33;
-                      color: #000;
-                      .bar-icon { color: #00a884;
-                        transform:scale(1.1) translateY(-.1rem)
-                      
-                      }
-                      border: 1px solid #202c33;;
-                    }
+                  
                     .bar-clear {
                     background: transparent;
                     border: none;
@@ -217,6 +215,11 @@
                     border-radius: 4px;
                     &:hover { color: #e9edef; background: rgba(134,150,160,.15); }
                   }
+                }
+
+                h4{
+                  color: variables.$light-color;
+                  padding: .1rem .5rem
                 }
 
                 .chat__empty {
@@ -454,6 +457,9 @@
             border-bottom: 1px solid #2d3e47;
             flex-shrink: 0;
             border-radius: 0 10px 0 0;
+            .back-btn{
+              display: none;
+            }
             &-avatar {
               width: 3.1rem;
               height: 3.1rem;
@@ -778,26 +784,7 @@
     }
   }
 
-  // 📱 Mobile optimizasyon
-  @media (max-width: 600px) {
-    width: 100%;
 
-    .friend-send {
-      flex-direction: column;
-    }
-
-    .request-item,
-    .friend-item {
-      flex-direction: column;
-      align-items: flex-start;
-
-      .right {
-        margin-top: 0.5rem;
-        width: 100%;
-        justify-content: flex-end;
-      }
-    }
-  }
 }
 
 /* 🌈 Genel buton stilleri */
@@ -1213,137 +1200,257 @@
 
 
 
-@media (max-width: 576px) {
-    .chat{
-    &__container{
-      height: 100vh;//98
-      width: 100% !important;//99
-    }
-    &__messages{
-      width: 100%;
-      position: relative;
-      padding: 1rem 2.8rem !important;
-      .message{
-        max-width: 80% !important;
-        padding: .9rem .8rem .6rem .8rem !important;
-        border-radius: 10px 10px 0 10px !important;
-        margin: 4px 0 !important;
-      }
-    }   
+// @media (max-width: 576px) {
+//     .chat{
+//     &__container{
+//       height: 100vh;//98
+//       width: 100% !important;//99
+//       display: none;
+//     }
+//     &__messages{
+//       width: 100%;
+//       position: relative;
+//       padding: 1rem 2.8rem !important;
+//       .message{
+//         max-width: 80% !important;
+//         padding: .9rem .8rem .6rem .8rem !important;
+//         border-radius: 10px 10px 0 10px !important;
+//         margin: 4px 0 !important;
+//       }
+//     }   
 
-    &__item{
-      height: 8rem !important;
-      padding: .6rem 0 !important;
-    }
-    &__avatar{
-      width: 4.5rem !important;
-      height:4.5rem !important;
-      border-radius: 50% !important;
-      flex-shrink: 0 !important;
-      padding: .1rem !important;
-      margin-left:.4rem !important;
-    }
-    &__info{
-      padding: 0 .1rem 0 .5rem !important;
-      .chat__name{
-      font-size: 1.7rem !important;
-      }
-      .chat__message{
-      font-size: 1.3rem !important;
-      font-weight: 500!important;
-      }            
-    }
+//     &__item{
+//       height: 8rem !important;
+//       padding: .6rem 0 !important;
+//     }
+//     &__avatar{
+//       width: 4.5rem !important;
+//       height:4.5rem !important;
+//       border-radius: 50% !important;
+//       flex-shrink: 0 !important;
+//       padding: .1rem !important;
+//       margin-left:.4rem !important;
+//     }
+//     &__info{
+//       padding: 0 .1rem 0 .5rem !important;
+//       .chat__name{
+//       font-size: 1.7rem !important;
+//       }
+//       .chat__message{
+//       font-size: 1.3rem !important;
+//       font-weight: 500!important;
+//       }            
+//     }
 
-    &__time{
+//     &__time{
+//       padding: 0 !important;
+//       width: 16%;
+//       span{
+//         width: 100%!important;
+//         padding: 0!important;
+//         margin: 0 !important;
+//         font-size: 1.1rem !important;
+//       }
+//     }
+
+//     &__options{
+//       width: 7%!important;
+//     }
+    
+//     &__list{
+//       width: 36%!important;
+//     }
+
+//     &__panel{
+//       width: 57%!important;
+//     }
+//   }
+// }
+
+@media (max-width: 768px) {
+ .reset{display: none!important}
+  
+ .chat-container {
+  display: grid !important;
+  grid-template-rows: 1fr!important; /* üst - içerik - alt */
+  width: 100vw !important;
+  height: 100dvh!important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  
+}
+
+/* === ALT MENU === */
+   .chat__options {
+    
+    width: 100vw !important;
+    max-width: none!important;
+    display: none !important;
+    flex-direction: row!important;
+    align-items: center !important;
+    background: #111b21 !important;
+    height: 10dvh!important;
+    border-top: 1px solid #2d3e47 !important;
+    z-index: 9999 !important;
+    padding-bottom: env(safe-area-inset-bottom);
+   
+    .__top, .__bottom {
+      flex-direction: row !important;
+      gap: 4.5rem !important;
       padding: 0 !important;
-      width: 16%;
-      span{
-        width: 100%!important;
-        padding: 0!important;
-        margin: 0 !important;
-        font-size: 1.1rem !important;
-      }
+      align-items: center!important;
     }
-
-    &__options{
-      width: 7%!important;
+    .__top{
+      margin-left:auto!important
     }
-    
-    &__list{
-      width: 36%!important;
+    .__bottom{
+      margin: 0 auto 0 0!important;
     }
-
-    &__panel{
-      width: 57%!important;
-    }
-  }
-}
-
-@media (min-width: 577px) and (max-width: 992px) {
-  .chat{
-    &__container{
-      height: 100vh;//95
-      width: 100%;//85
-    }
-    &__messages{
-      width: 100%;
-      position: relative;
-      padding: 1rem 2.8rem !important;
-      .message{
-        max-width: 60% !important;
-        padding: .9rem .8rem .6rem .8rem !important;
-        border-radius: 10px 10px 0 10px !important;
-        margin: 4px 0 !important;
-      }
-      
-    }   
-
-    &__item{
-      height: 8rem !important;
-      padding: .6rem 0 !important;
-    }
-    &__avatar{
-      width: 5.5rem !important;
-      height:5rem !important;
-      border-radius: 50% !important;
-      flex-shrink: 0 !important;
-      padding: .8rem !important;
-      margin-left:.4rem !important;
-    }
-
-    &__options{
-      width: 7%!important;
-    }
-    
-    &__list{
-      width: 35%!important;
-    }
-
-    &__panel{
-      width: 58%!important;
-    }
-
-    &__info{
-      .chat__name{
-      font-size: 1.7rem !important;
-      }
-      .chat__message{
-      font-size: 1.3rem !important;
-      font-weight: 500!important;
-      }     
-    }
+    &.is-visible{
+      display: flex !important;
+      position: fixed!important;
+      bottom:0!important;
  
+    }
+  }
+  
+/* === CHAT LIST === */
+.chat__list {
+  display: none !important;
+  overflow: hidden!important;
+  &.is-visible {
+    display: grid !important;
+    grid-template-rows: 1fr 9fr !important;
+    height: 90%!important;
+    width: 100% !important;
+    .list__body{
+      height: 100%!important;
+      .search-section{
+        height: 100%!important;
+        overflow-y: scroll!important;
+      }
+    }
+  }
+  .list__buttons{
+    div{
+      button{
+      font-size: 2.5rem!important;
+      margin:1rem!important}
+      .dropdown{
+        .dropdown-trigger{
+          font-size: 2.5rem!important;
+        }
+        button{
+           font-size: 1.5rem!important;
+        }
+      }
+    }
+  }
+ 
+}
+
+.chat-header {
+  flex-shrink: 0!important;
+  padding: 0.5rem 1rem!important;
+  border-bottom: 1px solid #d8bcbc!important;
+}
+
+/* === CHAT PANEL === */
+.chat__panel {
+  
+  display: none !important;
+  
+  box-sizing: border-box;
+  &.is-visible {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%!important;
+    height: 100dvh!important;
+    overflow:visible!important;
   }
 }
+
+.back-btn {
+  display: flex!important;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 15%;
+  border: none;
+  background: variables.$settings-backend;   /* koyu gri buton */
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.back-btn:hover {
+  background: #3a3f43;   /* hoverda biraz daha açık */
+  transform: scale(1.05);
+}
+
+.back-btn:active {
+  transform: scale(0.95);
+}
+
+.settings{
+  width: 100%!important;
+   .settings__body{
+    height: 70%!important;
+     overflow-y: scroll;
+  }
+}
+.settings-panel{
+  &.not-visible{
+    display: none!important;
+  }
+ 
+}
+
+
+.friend-requests {
+
+   width: 100%!important;
+
+    .friend-send {
+      flex-direction: column;
+      input{
+        font-size: 2rem!important;
+      }
+      button{
+        font-size: 1.6rem!important;
+      }
+    }
+
+    .request-item,
+    .friend-item {
+      flex-direction: column!important;
+      align-items: flex-start!important;
+
+      .right {
+        margin-top: 0.5rem!important;
+        width: 100%!important;
+        justify-content: flex-end!important;
+      }
+    }
+}
+
+}
+
+
+
 
 .unread-divider{
   position: relative;
   text-align: center;
   margin: .8rem 0;
-  font-size: 1.2rem; color: #8899a6;
+  width: 100%;
+  font-size: 1rem; color: #8899a6;
 }
 .unread-divider::before, .unread-divider::after{
-  content: ""; display: inline-block; width: 35%; height: 1px; background:#2d3e47; vertical-align: middle; margin: 0 1rem;
+
+  content: ""; display: inline-block; width: 30%; height: 1px; background:#2d3e47; vertical-align: middle; margin: 0 1rem;
 }
 
 
@@ -1388,11 +1495,115 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 .profile-drawer {
 
     &__hero {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     padding: 12px 8px 4px;
+    .profile-drawer__name-edit {
+      position: relative;
+      font-size: 1.2rem;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #2d3e47;
+      text-align: center;
+      color: #fff;
+      margin-bottom: 0.5rem;
+
+      &:focus {
+        outline: none;
+        border-bottom: 1px solid #25d366;
+      }
+    }
+  .avatar-upload {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  .avatar-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.6rem;
+    z-index: 2;
+  }
+
+  .avatar-camera {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.4rem;
+    transition: opacity 0.3s ease;
+    z-index: 1;
+  }
+  &:hover .avatar-camera {
+    opacity: 1;
+  }
+
+   img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+  }
+
+  // Overlay (kararma efekti)
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;                    // tam otursun
+    border-radius: 50%;          // tam daire
+    background: rgba(0, 0, 0, 0); 
+    transition: background 0.3s ease;
+    pointer-events: none;        // tıklamayı engellemesin
+  }
+
+  &:hover::before {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  // Kamera ikonu
+  &::after {
+    content: "📷";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.4rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .avatar-overlay {
+    position: absolute;
+    inset: 0; // top:0; right:0; bottom:0; left:0
+    background: rgba(0, 0, 0, 0.5); // yarı saydam
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 2rem;
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+}
   }
 
   &__overlay {
@@ -1721,6 +1932,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   object-fit: cover;
 }
 
+
 /* doküman tipi dosya için simge görünümü */
 .doc-thumb {
   display: flex;
@@ -1826,6 +2038,19 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 
 .bg-row button:hover {
   background: #c00!important;
+}
+
+.bg-thumb-img {
+  width: 45%;
+  object-fit:cover;
+  cursor: pointer;
+  margin: 5px;
+  border-radius: 15px!important;
+  transition: transform 0.2s ease-in-out;
+  display: block; /* ✅ boşlukları kaldırır */
+}
+.bg-thumb-img:hover {
+  transform: scale(1.05);
 }
 
 
@@ -1958,4 +2183,167 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 
 
 
+//+ modal 
 
+/* modal.scss */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal-card {
+  background: #1e1e1e;
+  color: #fff;
+  width: 30%;
+  max-width: 90%;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: slideIn 0.3s ease-out;
+}
+
+.modal-card h2 {
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  color: #ffcc00;
+}
+
+.modal-card input[type="text"],
+.modal-card input[type="file"] {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  border: none;
+  background: #2b2b2b;
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.modal-card input:focus {
+  outline: 2px solid #ffcc00;
+}
+
+.friends-list {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.friend-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+
+  &:hover {
+    background: #2c2c2c;
+  }
+}
+
+
+
+
+.friend-option input {
+  accent-color: #ffcc00;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+.modal-actions button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.modal-actions button:first-child {
+  background: linear-gradient(45deg, #ff0099, #ffcc00);
+  color: #000;
+}
+
+.modal-actions button:last-child {
+  background: #444;
+  color: #fff;
+}
+
+.modal-actions button:hover {
+  transform: scale(1.05);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.group-avatar-upload {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.group-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffcc00;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.group-avatar:hover {
+  transform: scale(1.05);
+}
+
+
+.friend-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.friend-info {
+  display: flex;
+  flex-direction: column;
+  max-width: 200px; // gerektiğinde küçült
+}
+
+.friend-username {
+  font-weight: 600;
+  color: #fff;
+}
+
+.friend-about {
+  font-size: 0.85rem;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

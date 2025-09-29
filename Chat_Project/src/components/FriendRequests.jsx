@@ -92,9 +92,7 @@ export default function FriendRequests({ socket, showNotification }) {
             <div key={r._id} className="request-item">
               <div className="left">
                 <img
-                  src={
-                    r?.avatar?.url || "https://avatar.iran.liara.run/public/48"
-                  }
+                  src={r?.avatar?.url || "images/default-avatar.jpg"}
                   alt=""
                   width={36}
                   height={36}

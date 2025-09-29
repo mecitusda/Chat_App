@@ -4,11 +4,11 @@ import { useDispatch ,useSelector  } from "react-redux";
 import { io } from "socket.io-client";
 import { setPresence, setPresenceBulk } from "../slices/presenceSlice";
 import {
-resetUnread,
 setUnread
 } from "../slices/conversationSlice";
 import { upsertProfileAvatars } from "../utils/upsertProfileAvatars";
 import {store} from "../store/index"
+import { useUser } from "../contextAPI/UserContext";
 /**
  * status: "connecting" | "connected" | "reconnecting" | "offline"
  * addOrUpdateConversations: slice action creator (payload: conversations array)
@@ -30,7 +30,7 @@ export const getPeerIdsFromConversation = (c, meId) => {
 export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,dispatch) {
   //const dispatch = useDispatch();
   const [status, setStatus] = useState("connecting");
-
+  const { user } = useUser();
   const socket = useMemo(() => {
     if (!SOCKET_URL) return null;
     return io(SOCKET_URL, {
@@ -74,6 +74,9 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
 
  
     };
+
+
+
     const last_seen = localStorage.getItem("last_seen");
     const onConnect = () => {
       setStatus("connected");

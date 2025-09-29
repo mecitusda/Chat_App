@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { getSignedUrlFromStorage } from "../utils/storage.js";
+import { type } from "os";
 
 const ConversationSchema = new mongoose.Schema({
   type: { type: String, enum: ["private", "group"], required: true },
@@ -29,6 +30,8 @@ const ConversationSchema = new mongoose.Schema({
     sent_at: Date,
     status: { type: String, enum: ["sent", "delivered", "read"], default: "sent" },
   },
+  unread: { type:Number, default:0 },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
 
 ConversationSchema.index({ _id: 1, "members.user": 1 });

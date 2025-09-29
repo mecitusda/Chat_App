@@ -6,40 +6,43 @@ import PlusMenu from "./PlusMenu";
  * props:
  * - socket
  * - conversationId
+ * - conversation
  * - userId
  * - isOnline
  * - onOptimisticMessage(tempMsg)
  * - onAckReplace(tempId, serverMsg)
  * - onAckStatus(tempId, status)
+ * - activeConversation, setActiveConversation, setactiveConversationId
  */
-
 export default function ChatInput({
   socket,
   conversationId,
+  conversation,
   userId,
   isOnline,
   onOptimisticMessage,
   onAckReplace,
   onAckStatus,
   file,
-  filePreviewUrl,
   setFile,
   setFilePreviewUrl,
+  activeConversation,
+  setActiveConversation,
+  setactiveConversationId,
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef(null);
 
-  // --- TYPING HEARTBEAT ---
+  // --- typing mantığı ---
   const typingRef = useRef(false);
   const lastKeyAtRef = useRef(0);
   const lastSentAtRef = useRef(0);
-  const hbTimerRef = useRef(null);
   const stopTimerRef = useRef(null);
+  const hbTimerRef = useRef(null);
 
   const TYPING_IDLE_MS = 1200;
   const TYPING_HEARTBEAT_MS = 3000;
-  const HB_TICK_MS = 800;
 
   const startTyping = () => {
     if (!socket || !isOnline || !conversationId || !userId) return;
@@ -47,16 +50,6 @@ export default function ChatInput({
       typingRef.current = true;
       socket.emit("typing", { conversationId, userId, isTyping: true });
       lastSentAtRef.current = Date.now();
-    }
-  };
-
-  const heartbeatTyping = () => {
-    if (!socket || !isOnline || !conversationId || !userId) return;
-    if (!typingRef.current) return;
-    const now = Date.now();
-    if (now - lastSentAtRef.current >= TYPING_HEARTBEAT_MS) {
-      socket.emit("typing", { conversationId, userId, isTyping: true });
-      lastSentAtRef.current = now;
     }
   };
 
@@ -81,26 +74,28 @@ export default function ChatInput({
     }, TYPING_IDLE_MS);
   };
 
+  // heartbeat
   useEffect(() => {
-    hbTimerRef.current = setInterval(heartbeatTyping, HB_TICK_MS);
+    hbTimerRef.current = setInterval(() => {
+      if (!socket || !isOnline || !conversationId || !userId) return;
+      if (
+        typingRef.current &&
+        Date.now() - lastSentAtRef.current >= TYPING_HEARTBEAT_MS
+      ) {
+        socket.emit("typing", { conversationId, userId, isTyping: true });
+        lastSentAtRef.current = Date.now();
+      }
+    }, 800);
+
     return () => clearInterval(hbTimerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, conversationId, userId, isOnline]);
 
-  // ---- Dosya seçimi / presign + upload ----
-  const handlePlusSelect = (type) => {
-    if (type === "media" || type === "document" || type === "camera") {
-      fileInputRef.current?.click();
-    }
-  };
-
+  // dosya preview
   useEffect(() => {
     if (file) {
       const preview = URL.createObjectURL(file);
       setFilePreviewUrl(preview);
-      return () => {
-        URL.revokeObjectURL(preview);
-      };
+      return () => URL.revokeObjectURL(preview);
     } else {
       setFilePreviewUrl(null);
     }
@@ -111,8 +106,15 @@ export default function ChatInput({
     if (f) setFile(f);
   };
 
+  const handlePlusSelect = (type) => {
+    if (["media", "document", "camera"].includes(type)) {
+      fileInputRef.current?.click();
+    }
+  };
+
   const makeTempId = () => "tmp_" + Math.random().toString(36).slice(2, 10);
 
+  // presign upload
   async function presignAndUpload({ file, conversationId }) {
     const { data } = await axios.get(
       `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/message`,
@@ -127,55 +129,78 @@ export default function ChatInput({
     });
     return { mediaKey, mime: file.type, size: file.size };
   }
-  const handleKeyDown = (e) => {
-    // IME (örn. Türkçe öngörü) sırasında tetikleme
-    if (e.isComposing || e.keyCode === 229) return;
 
-    // Enter = gönder, Shift+Enter = satır başı
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(); // <-- burada mevcut gönderme fonksiyonunu çağır
-    }
-  };
+  // gönderme
   async function handleSend() {
-    if (!isOnline || !conversationId || !userId) return;
+    if (!isOnline || !userId) return;
     if (!text.trim() && !file) return;
 
     setSending(true);
     const tempId = makeTempId();
 
     try {
-      let media = null;
-      if (file) media = await presignAndUpload({ file, conversationId });
+      let convId = conversationId;
 
-      // optimistic — artık receipts yok, dizi alanları kullanıyoruz
+      // 📌 Private pending ise → önce sohbet oluştur
+      if (activeConversation?.isPending) {
+        const friendId = activeConversation.members.find(
+          (m) => m.user._id !== userId
+        ).user._id;
+
+        const resp = await new Promise((resolve) => {
+          socket.emit(
+            "conversation:create-private",
+            { userId, friendId },
+            (res) => resolve(res)
+          );
+        });
+
+        if (!resp.success) {
+          setSending(false);
+          return alert(resp.message || "Sohbet oluşturulamadı");
+        }
+
+        setActiveConversation(resp.conversation);
+        setactiveConversationId(resp.conversation._id);
+        convId = resp.conversation._id;
+      }
+
+      // 📌 dosya varsa upload
+      let media = null;
+      if (file) {
+        media = await presignAndUpload({ file, conversationId: convId });
+      }
+      console.log("file: ", media);
       const nowISO = new Date().toISOString();
       const optimistic = {
         _id: tempId,
-        conversation: conversationId,
+        conversation: convId,
         sender: userId,
-        // server text/mime'ye bakıp "image|video|file|text"e çeviriyor, o yüzden burada MIME göndermeye devam
-        type: media ? media.mime : "text",
+        type: media
+          ? media.mime.startsWith("image/")
+            ? "image"
+            : media.mime.startsWith("video/")
+            ? "video"
+            : "file"
+          : "text",
         text: text.trim() || null,
         media_key: media?.mediaKey || null,
         mimetype: media?.mime || null,
         size: media?.size || null,
-        // yeni model
-        deliveredTo: [], // <— boş başlat
-        readBy: [], // <— boş başlat
-        // UI için yardımcı alanlar
+        deliveredTo: [],
+        readBy: [],
         createdAt: nowISO,
         updatedAt: nowISO,
-        // yalnızca optimistic akışta kullanıyoruz (ikon başlangıcı)
         status: "sending",
       };
 
       onOptimisticMessage?.(optimistic);
 
+      // 📌 servera yolla
       socket.emit(
         "send-message",
         {
-          conversationId,
+          conversationId: convId,
           sender: userId,
           type: optimistic.type,
           text: optimistic.text,
@@ -186,37 +211,34 @@ export default function ChatInput({
         },
         (ack) => {
           if (!ack || ack.success === false) {
-            onAckStatus?.(conversationId, tempId, "failed");
+            onAckStatus?.(convId, tempId, "failed");
             setSending(false);
             return;
           }
-          // serverMessage artık deliveredTo/readBy dizileriyle gelecek
           onAckReplace?.(tempId, ack.message);
           setSending(false);
         }
       );
     } catch (err) {
       console.error("send error:", err);
-      console.error("server says:", err.response?.status, err.response?.data);
-      onAckStatus?.(tempId, "failed");
+      onAckStatus?.(conversationId, tempId, "failed");
       setSending(false);
     } finally {
       setText("");
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-
-      // yazmayı bitir
       clearTimeout(stopTimerRef.current);
       stopTyping();
     }
   }
 
-  useEffect(() => {
-    return () => {
-      clearTimeout(stopTimerRef.current);
-      clearInterval(hbTimerRef.current);
-    };
-  }, []);
+  const handleKeyDown = (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="chat__input-area">
@@ -227,7 +249,7 @@ export default function ChatInput({
         type="file"
         style={{ display: "none" }}
         onChange={handleFileChange}
-        accept="image/*,video/*"
+        accept="image/*,video/*,application/*"
       />
 
       <input

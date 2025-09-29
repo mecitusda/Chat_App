@@ -171,8 +171,9 @@ router.get("/:userId", async (req, res) => {
       .populate("last_message.sender", "username avatar")
       .populate("members.user", "username avatar status about")
       .populate("last_message.message", "")
+      .populate("createdBy","")
       .exec();
-
+    console.log("conversation: ", conversations)
     // 2) Avatarları güncelle
     for (const conv of conversations) {
       // ✅ Conversation avatar
@@ -232,7 +233,100 @@ router.get("/:userId", async (req, res) => {
 // /routes/messages.js
 
 
+// Private chat oluştur veya varsa getir
+router.post("/private", async (req, res) => {
+  try {
+    const { userId, otherUserId } = req.body;
 
+    if (!userId || !otherUserId) {
+      return res.status(400).json({ success: false, message: "Eksik bilgi" });
+    }
+
+    // Önceden var mı kontrol et
+    let conversation = await Conversation.findOne({
+      type: "private",
+      "members.user": { $all: [userId, otherUserId] },
+      $expr: { $eq: [{ $size: "$members" }, 2] },
+    });
+
+    // Yoksa oluştur
+    if (!conversation) {
+      conversation = await Conversation.create({
+        type: "private",
+        members: [
+          { user: userId },
+          { user: otherUserId },
+        ],
+      });
+    }
+
+    await conversation.populate("members.user", "username avatar");
+
+    res.json({ success: true, conversation });
+  } catch (err) {
+    console.error("❌ private chat error:", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası" });
+  }
+});
+
+
+// Grup chat oluştur
+router.post("/group", async (req, res) => {
+  try {
+    const { userId, name, members, avatarKey, createdBy } = req.body;
+
+    if (!userId || !name || !Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Eksik bilgi: userId, name, members gerekli."
+      });
+    }
+
+    // Tekrarlı üyeleri engelle
+    const uniqueMembers = [...new Set([...members, userId])];
+
+    // ✅ avatar alanı obje olmalı
+    const avatarObj = avatarKey
+      ? { key: avatarKey, url: "", url_expiresAt: null }
+      : { key: "", url: "", url_expiresAt: null };
+
+    // ✅ conversation oluştur
+    let conversation = await Conversation.create({
+      type: "group",
+      name,
+      avatar: avatarObj,
+      members: uniqueMembers.map((id) => ({
+        user: id,
+        role: id === userId ? "admin" : "member",
+      })),
+      createdBy,
+    });
+
+    // ✅ Avatar URL güncelle (eğer key varsa)
+    if (conversation.avatar?.key) {
+      conversation.avatar = await conversation.getAvatarUrl();
+    }
+
+
+    // ✅ Birden fazla conversation için refresh method'u Model üzerinden çağırılır
+    const [refreshedConv] = await Conversation.refreshAvatars([conversation]);
+        // ✅ populate işlemleri
+    await refreshedConv.populate("members.user", "username avatar createdBy");
+    await refreshedConv.populate("createdBy", "username");
+
+    res.status(201).json({
+      success: true,
+      conversation: refreshedConv,
+    });
+  } catch (err) {
+    console.error("❌ group chat error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: err.message,
+    });
+  }
+});
 
 router.post("/message", async (req, res) => {
   try {
@@ -241,7 +335,7 @@ router.post("/message", async (req, res) => {
     //console.log("data: ",{ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
     // uyumluluk: eski client "media" yollarsa gerçek türe çevir
     
-
+    console.log({ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
     // güvenlik: text vs media boşluk kontrolü
     if (type === "text" && !text) return res.status(400).json({ error: "Text boş" });
     if (["image","video","file"].includes(type) && !media_key)
@@ -524,4 +618,50 @@ router.patch('/user/last_seen/:id', async (req,res) => {
     res.status(500).json({ error: "Sunucu hatası" });
   }
 })
+
+router.patch("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, name, avatarKey } = req.body;
+
+    // Sohbeti bul
+    const conversation = await Conversation.findById(id);
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: "Sohbet bulunamadı" });
+    }
+
+    // Grup mu kontrol et
+    if (conversation.type !== "group") {
+      return res.status(400).json({ success: false, message: "Sadece grup sohbeti güncellenebilir" });
+    }
+
+    // Yalnızca kurucu güncelleyebilsin
+    if (String(conversation.createdBy) !== String(userId)) {
+      return res.status(403).json({ success: false, message: "Yetkisiz işlem" });
+    }
+
+    // Güncellemeler
+    if (name) {
+      conversation.name = name;
+    }
+
+    if (avatarKey) {
+      conversation.avatar = {
+        key: avatarKey,
+        url: "",
+        url_expiresAt: null,
+      };
+      await conversation.getAvatarUrl(); // presigned URL güncelle
+    }
+
+    await conversation.save();
+    await conversation.populate("members.user", "username avatar");
+    await conversation.populate("createdBy", "username");
+
+    res.json({ success: true, conversation });
+  } catch (err) {
+    console.error("conversation update error:", err.message);
+    res.status(500).json({ success: false, message: "Sunucu hatası" });
+  }
+});
 export default router;

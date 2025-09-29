@@ -88,7 +88,7 @@ async function deliveredFromBatch({ batch, conversationId, viewerId }) {
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173"], // Geliştirme için, prod’da domain belirt
+    origin: ["http://localhost:5173","https://qbh9xq6w-5173.euw.devtunnels.ms"], // Geliştirme için, prod’da domain belirt
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -168,7 +168,7 @@ io.on("connection", (socket) => {
     // joinRoom(socket, conversationId);
   });
 
-    socket.on("typing", ({ conversationId, userId, isTyping }) => {
+  socket.on("typing", ({ conversationId, userId, isTyping }) => {
     if (!conversationId || !userId) return;
 
     const key = `${conversationId}:${userId}`;
@@ -215,10 +215,7 @@ io.on("connection", (socket) => {
       // 1) DB’ye yaz (REST API’n)
       // örnek bir endpoint varsayıyorum:
       // POST /api/conversation/:id/message
-      const kind = type?.startsWith("image/") ?"image"
-                : type?.startsWith("video/") ?"video"
-                : type?.startsWith("application/") ?"file"
-                  :"text";
+
       // console.log({
       //   conversationId,
       //   sender,
@@ -234,7 +231,7 @@ io.on("connection", (socket) => {
         {
           conversation:conversationId,
           sender,
-          type:kind,
+          type,
           text,
           media_key,
           mimetype,
@@ -258,8 +255,9 @@ io.on("connection", (socket) => {
         success: true,
         messages: [serverMessage],
         conversationId, // client handler’ı kullanıyorsa ekle
-        message:"mesaj gönderildi."
+        message:"send-message"
       });
+      
       // console.log("güncellenmiş chat: ",data?.chat)
       const responsemembers = await axios.get(`${BACKEND_URL}/api/conversation/${conversationId}/members`)
       for (const m of responsemembers.data?.members) {
@@ -361,7 +359,6 @@ io.on("connection", (socket) => {
       `${process.env.BACKEND_URL}/api/file/presigned-url/avatars`,
       {expiredAvatars:expiredAvatars}
     );
-    console.log("data: ", data)
     if (data.success) {
       socket.emit("conversation-avatars-updated", {updates:data.results});
     } else {
@@ -371,7 +368,7 @@ io.on("connection", (socket) => {
     console.error("❌ refresh-conversation-avatars socket error:", err);
     socket.emit("error", "Avatar yenileme başarısız oldu");
   }
-});
+  });
 
  
   socket.on("presence:subscribe", ({ userIds = [] } = {}) => {
@@ -412,9 +409,9 @@ io.on("connection", (socket) => {
   } catch (err) {
     console.error("message:delivered error:", err?.response?.data || err?.message);
   }
-});
+  });
 
-socket.on("message:read", async ({ messageIds = [], conversationId, userId }) => {
+  socket.on("message:read", async ({ messageIds = [], conversationId, userId }) => {
   try {
     await axios.patch(`${BACKEND_URL}/api/conversation/message/status`, {
       ids: messageIds,
@@ -432,46 +429,46 @@ socket.on("message:read", async ({ messageIds = [], conversationId, userId }) =>
   } catch (err) {
     console.error("message:read error:", err?.response?.data || err?.message);
   }
-});
+  });
 
 
   //friends
 
-    socket.on("friends:requests:list", async ({ userId }) => {
-  try {
-    const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/requests/${userId}`);
-    socket.emit("friends:requests:list", { success: true, requests: data.requests || [] });
-  } catch (err) {
-    console.error("friends:requests:list error:", err?.response?.data || err?.message);
-    socket.emit("friends:requests:list", { success: false, requests: [], error: "istekler alınamadı" });
-  }
-});
+  socket.on("friends:requests:list", async ({ userId }) => {
+    try {
+      const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/requests/${userId}`);
+      socket.emit("friends:requests:list", { success: true, requests: data.requests || [] });
+    } catch (err) {
+      console.error("friends:requests:list error:", err?.response?.data || err?.message);
+      socket.emit("friends:requests:list", { success: false, requests: [], error: "istekler alınamadı" });
+    }
+  });
 
-socket.on("friends:list:get", async ({ userId }) => {
-  try {
-    const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/${userId}`);
-    socket.emit("friends:list", { success: true, friends: data.friends || [] });
-  } catch (err) {
-    console.error("friends:list:get error:", err?.response?.data || err?.message);
-    socket.emit("friends:list", { success: false, friends: [], error: "arkadaşlar alınamadı" });
-  }
-});
+  socket.on("friends:list:get", async ({ userId }) => {
+    try {
+      const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/${userId}`);
+      socket.emit("friends:list", { success: true, friends: data.friends || [] });
+    } catch (err) {
+      console.error("friends:list:get error:", err?.response?.data || err?.message);
+      socket.emit("friends:list", { success: false, friends: [], error: "arkadaşlar alınamadı" });
+    }
+  });
 
-// Arkadaşlık isteği gönder (numarayla veya toUserId ile)
-socket.on("friends:send-request", async ({ fromUserId, phone }, ack) => {
-  try {
-    const { data } = await axios.post(`${BACKEND_URL}/api/auth/friends/request`, {
+  // Arkadaşlık isteği gönder (numarayla veya toUserId ile)
+  socket.on("friends:send-request", async ({ fromUserId, phone }, ack) => {
+    try {
+      const { data } = await axios.post(`${BACKEND_URL}/api/auth/friends/request`, {
       fromUserId,
       phone,
-    });
+      });
 
-    if (!data.success) {
-      ack?.({ success: false, message: data.message });
-      return;
-    }
+      if (!data.success) {
+        ack?.({ success: false, message: data.message });
+        return;
+      }
 
-    // 🔥 Karşılıklı istek varsa
-    if (data.autoAccepted) {
+      // 🔥 Karşılıklı istek varsa
+      if (data.autoAccepted) {
 
 
       // İlk isteği atan kişiye: "2. atanı arkadaşına ekle"
@@ -485,84 +482,84 @@ socket.on("friends:send-request", async ({ fromUserId, phone }, ack) => {
       });
 
       ack?.({ success: true, message: "Arkadaş olarak eklendiniz 🤝" });
-    } else {
+      } else {
       // 🔔 Normal istek → karşı tarafa bildir
       io.to(`user:${data.toUserId}`).emit("friends:request:incoming", {
         fromUser: data.fromUser,
       });
 
-      ack?.({ success: true, message: data.message });
-    }
-  } catch (err) {
-    console.error("friends:send-request error:", err?.response?.data || err?.message);
-    ack?.({
+         ack?.({ success: true, message: data.message });
+       }
+     } catch (err) {
+       console.error("friends:send-request error:", err?.response?.data || err?.message);
+       ack?.({
       success: false,
       message: err?.response?.data?.message || "Sunucu hatası",
-    });
-  }
-});
-
-
-// İsteği kabul et
-socket.on("friends:accept", async ({ userId, fromUserId }, ack) => {
-  try {
-    const { data } = await axios.patch(
-      `${BACKEND_URL}/api/auth/friends/accept`,
-      { userId, fromUserId }
-    );
-
-    if (!data?.success) {
-      ack?.({ success: false, message: data?.message || "Kabul edilemedi" });
-      return;
+      });
     }
-
-    // ✅ İsteği yapan (userId) → sadece ack
-    ack?.({ success: true, message: "Arkadaş eklendi 🤝", friendId: fromUserId });
-
-    // ✅ Karşı tarafa emit (isteği gönderen kullanıcıya)
-    io.to(`user:${String(fromUserId)}`).emit("friends:request:accepted", {
-      user: data.user,
-    });
-
-  } catch (err) {
-    console.error("friends:accept error:", err?.response?.data || err?.message);
-    ack?.({ success: false, message: "Sunucu hatası" });
-  }
-});
+  });
 
 
+  // İsteği kabul et
+  socket.on("friends:accept", async ({ userId, fromUserId }, ack) => {
+    try {
+      const { data } = await axios.patch(
+        `${BACKEND_URL}/api/auth/friends/accept`,
+        { userId, fromUserId }
+      );
 
-// İsteği reddet
-socket.on("friends:reject", async ({ userId, fromUserId }, ack) => {
-  try {
+      if (!data?.success) {
+        ack?.({ success: false, message: data?.message || "Kabul edilemedi" });
+        return;
+      }
+
+      // ✅ İsteği yapan (userId) → sadece ack
+        ack?.({ success: true, message: "Arkadaş eklendi 🤝", friendId: fromUserId });
+
+      // ✅ Karşı tarafa emit (isteği gönderen kullanıcıya)
+      io.to(`user:${String(fromUserId)}`).emit("friends:request:accepted", {
+        user: data.user,
+      });
+
+    } catch (err) {
+      console.error("friends:accept error:", err?.response?.data || err?.message);
+      ack?.({ success: false, message: "Sunucu hatası" });
+    }
+  });
+
+
+
+  // İsteği reddet
+  socket.on("friends:reject", async ({ userId, fromUserId }, ack) => {
+    try { 
     const { data } = await axios.patch(
       `${BACKEND_URL}/api/auth/friends/reject`,
       { userId, fromUserId }
     );
 
-    if (!data?.success) {
-      ack?.({ success: false, message: data?.message || "Reddedilemedi" });
-      return;
+      if (!data?.success) {
+        ack?.({ success: false, message: data?.message || "Reddedilemedi" });
+        return;
+      }
+
+      // ✅ İsteği yapan (userId) → sadece ack
+      ack?.({ success: true, message: "Arkadaşlık isteği reddedildi 🚫", fromUserId });
+
+      // ✅ Karşı tarafa emit (isteği gönderen kullanıcıya)
+      io.to(`user:${String(fromUserId)}`).emit("friends:request:rejected", {
+        username: data.toUsername,
+      });
+
+    } catch (err) {
+      console.error("friends:reject error:", err?.response?.data || err?.message);
+      ack?.({ success: false, message: "Sunucu hatası" });
     }
-
-    // ✅ İsteği yapan (userId) → sadece ack
-    ack?.({ success: true, message: "Arkadaşlık isteği reddedildi 🚫", fromUserId });
-
-    // ✅ Karşı tarafa emit (isteği gönderen kullanıcıya)
-    io.to(`user:${String(fromUserId)}`).emit("friends:request:rejected", {
-      username: data.toUsername,
-    });
-
-  } catch (err) {
-    console.error("friends:reject error:", err?.response?.data || err?.message);
-    ack?.({ success: false, message: "Sunucu hatası" });
-  }
-});
+  });
 
 
 
-// Arkadaş silme
-socket.on("friends:remove", async ({ userId, friendId }, ack) => {
+  // Arkadaş silme
+  socket.on("friends:remove", async ({ userId, friendId }, ack) => {
   try {
     const { data } = await axios.patch(
       `${BACKEND_URL}/api/auth/friends/remove`,
@@ -584,7 +581,89 @@ socket.on("friends:remove", async ({ userId, friendId }, ack) => {
     console.error("friends:remove error:", err?.response?.data || err?.message);
     ack?.({ success: false, message: "Sunucu hatası" });
   }
-});
+  });
+
+  socket.on("conversation:create-group", async ({ userId, name, members, avatarKey, createdBy }, ack) => {
+  try {
+    // API'yi çağır
+    const { data } = await axios.post(`${BACKEND_URL}/api/conversation/group`, {
+      userId,
+      name,
+      members,
+      avatarKey,
+      createdBy
+    });
+
+    if (!data.success) {
+      ack?.({ success: false, message: data.message });
+      return;
+    }
+
+    // ✅ Tüm üyelere socket üzerinden bildir
+    for (const m of data.conversation.members.map(mem => mem.user._id)) {
+      socket.to(`user:${String(m)}`).emit("chatList:update", {
+        data: data.conversation,
+        message:`group-created`
+      });
+    }
+
+    // ✅ İstek atan client’a ack dön
+    ack?.({ success: true, conversation: data.conversation });
+  } catch (err) {
+    console.error("conversation:create-group error:", err?.response?.data || err.message);
+    ack?.({ success: false, message: "Sunucu hatası" });
+  }
+  });
+
+  socket.on("conversation:create-private", async ({ userId, friendId }, ack) => {
+  try {
+    const { data } = await axios.post(`${BACKEND_URL}/api/conversation/private`, {
+      userId,
+      otherUserId: friendId,
+    });
+
+    if (!data.success) {
+      return ack?.({ success: false, message: data.message });
+    }
+
+    // ✅ Sohbeti sadece ack ile döndür
+    ack?.({ success: true, conversation: data.conversation });
+  } catch (err) {
+    console.error("conversation:create-private error:", err?.message);
+    ack?.({ success: false, message: "Sunucu hatası" });
+  }
+  });
+
+  socket.on("conversation:update", async ({ conversationId, userId, name, avatarKey }, ack) => {
+    try {
+      // 1) API'yi çağır
+      const { data } = await axios.patch(
+        `${BACKEND_URL}/api/conversation/${conversationId}`,
+        { userId, name, avatarKey }
+      );
+
+      if (!data.success) {
+        ack?.({ success: false, message: data.message });
+        return;
+      }
+
+      const updatedConv = data.conversation;
+      console.log("updatedChat: ",updatedConv)
+      // 2) Tüm üyelere yayınla (chat listelerini güncellemek için)
+      for (const m of updatedConv.members.map(mem => mem.user._id)) {
+        socket.to(`user:${String(m)}`).emit("chatList:update", {
+          data: updatedConv,
+          message: "conversation-updated",
+        });
+      }
+
+      // 3) Başarılı ACK dön
+      ack?.({ success: true, conversation: updatedConv });
+    } catch (err) {
+      console.error("conversation:update error:", err?.response?.data || err?.message);
+      ack?.({ success: false, message: "Sunucu hatası" });
+    }
+  });
 
 
 

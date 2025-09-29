@@ -4,7 +4,7 @@ import { getSignedUrlFromStorage } from "../utils/storage.js";
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, trim: true },
   email: { type: String, required: true, lowercase: true, trim: true },
-  about: {type: String,require: false},
+  about: {type: String,require: false, default:"Sadece acil aramalar."},
   password_hash: { type: String, required: true },
   avatar: {
     key:{ type: String, default: "" },

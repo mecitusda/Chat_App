@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { selectPresence } from "../slices/presenceSlice";
-
+import { FiArrowLeft } from "react-icons/fi"; // Feather
 function formatLastSeen(ts) {
   if (!ts || typeof ts !== "number" || isNaN(ts)) {
     return "Çevrimdışı";
@@ -23,6 +23,8 @@ const ChatPanel_Header = ({
   name,
   avatar,
   onOpenProfile,
+  setActiveConversation,
+  setactiveConversationId,
 }) => {
   // --- PRIVATE: karşı tarafın id'si
   const peerId =
@@ -67,6 +69,16 @@ const ChatPanel_Header = ({
 
   return (
     <div className="chat__header">
+      <button
+        className={`back-btn`}
+        onClick={() => {
+          setActiveConversation(null);
+          setactiveConversationId(null);
+        }}
+      >
+        {" "}
+        <FiArrowLeft />
+      </button>
       <img
         src={avatar}
         alt={name}

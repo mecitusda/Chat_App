@@ -12,4 +12,13 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
+  <script>function setVH() {
+  // innerHeight -> tarayıcının o anki görünen yüksekliği
+  let vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+setVH();
+// ekran döndüğünde, resize olduğunda tekrar hesapla
+window.addEventListener('resize', setVH);</script>
 </html>

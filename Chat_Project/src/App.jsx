@@ -12,11 +12,18 @@ import Register from "./pages/Register.jsx";
 import Login from "./pages/Login.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import { ProtectedRoute, AuthRoute } from "./routes/AppRouter.jsx";
+import Home from "./pages/Home.jsx";
 
 const routes = createBrowserRouter([
+  // 1️⃣ Ana sayfa
   {
     path: "/",
-    element: <MainLayout />,
+    element: <Home />, // sadece Home, MainLayout yok
+  },
+
+  // 2️⃣ MainLayout altında çalışan sayfalar
+  {
+    element: <MainLayout />, // ortak layout
     children: [
       {
         element: <AuthRoute />,

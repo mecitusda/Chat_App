@@ -8,47 +8,26 @@ import ChatPanel from "../components/ChatPanel";
 import { useSocket } from "../hooks/useSocket";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAtBottom } from "../slices/uiSlice";
-import { store } from "../store/index";
 import { updateConversationAvatars } from "../slices/conversationSlice";
 // Conversations
 import {
   addOrUpdateConversations,
-  setConversations,
   incrementUnread,
-  setUnread,
-  // setConversations,
-  resetConversation,
 } from "../slices/conversationSlice";
 
 // Messages
-import {
-  addOrUpdateMessages,
-  applyMessageAck,
-  // setMessages,
-  resetMessages,
-} from "../slices/messageSlice";
+import { addOrUpdateMessages, applyMessageAck } from "../slices/messageSlice";
 
 // Files (presigned URL yönetimi için)
-import {
-  setFiles,
-  upsertFiles,
-  // setFiles,
-  resetFile,
-} from "../slices/fileSlice";
+import { upsertFiles } from "../slices/fileSlice";
 
-// Pagination (before yönü)
-import {
-  setHasMore,
-  setOldestMessageId,
-  resetPaginationForConversation,
-  // resetAllPagination,
-} from "../slices/paginationSlice";
+import { setHasMore, setOldestMessageId } from "../slices/paginationSlice";
 import { useOutletContext } from "react-router";
-import { useUser } from "../contextAPI/UserContext";
-import NotificationBanner from "../components/NotificationBanner";
+
 import SettingsPanel from "../components/SettingPanel";
 import FriendRequests from "../components/FriendRequests";
 import { useFriends } from "../hooks/useFriends";
+import { useUser } from "../contextAPI/UserContext";
 
 const playNotificationSound = () => {
   const audio = new Audio("/sounds/new-notification.mp3");
@@ -83,12 +62,12 @@ const Chat = () => {
   const filesByConv = useSelector((s) => s.files?.byKey || {});
   const { requests, friends } = useSelector((state) => state.friends);
   const uis = useSelector((s) => s.ui.atBottomByConv || []);
-
   //console.log("arkadaşlar: ", friends);
   //console.log("chatler: ", conversations);
   //console.log("files: ", filesByConv);
   //console.log("mesajlar: ", messagesByConv);
   //console.log("uis: ", uis);
+
   // UI state
   const [activePage, setActivePage] = useState("chatList");
 
@@ -132,6 +111,7 @@ const Chat = () => {
   const activeAtBottom = useSelector((s) =>
     selectAtBottom(s, activeConversation?._id)
   );
+
   // === Presigned URL yenileme: ayrı effect (filesByConv bağımlı) ===
   useEffect(() => {
     if (!socket) return;
@@ -154,25 +134,6 @@ const Chat = () => {
         conversationId: convId,
       });
     }
-
-    // 3) Aktif conversation üyelerinin avatarları expired kontrolü
-    // if (activeConversation?.members?.length > 0) {
-    //   const expiredAvatars = activeConversation.members
-    //     .filter(
-    //       (m) =>
-    //         m.user?.avatar?.url &&
-    //         (!m.user.avatar.url_expiresAt ||
-    //           new Date(m.user.avatar.url_expiresAt) <= now)
-    //     )
-    //     .map((m) => m.user._id);
-
-    //   if (expiredAvatars.length > 0) {
-    //     socket.emit("refresh-avatars", {
-    //       conversationId: convId,
-    //       userIds: expiredAvatars,
-    //     });
-    //   }
-    // }
   }, [socket, filesByConv, activeConversation?._id, user]);
 
   // === Socket listeners (tek sefer bağla) ===
@@ -183,7 +144,7 @@ const Chat = () => {
       const arr = newData?.messages || [];
       const page = newData?.pageInfo || {};
       setFetchingNew(false);
-      //console.log("newData: ", newData);
+      console.log("newData: ", newData);
       const convId =
         newData.conversationId ||
         arr[0]?.conversation ||
@@ -334,7 +295,7 @@ const Chat = () => {
       // Sunucu 'status' gönderiyor ("delivered" | "read")
       const ids = messageId ? [messageId] : messageIds || [];
       if (ids.length === 0) return;
-
+      console.log("mesaj değişmeli: ", ids);
       dispatch(
         applyMessageAck({
           conversationId: conversationId || activeConversation?._id, // yoksa aktif sohbete yaz
@@ -416,11 +377,23 @@ const Chat = () => {
       const panelAtBottom = isActiveConv ? activeAtBottom : false;
       const isTabVisible = document.visibilityState === "visible";
       const isFromOther = r.data?.last_message?.sender?._id !== userId;
-      //console.log("chatlistupdate: ,", [data]);
+      console.log(
+        "isavtive: ,",
+        isActiveConv,
+        "panel bottom:",
+        panelAtBottom,
+        "istabvisible:",
+        isTabVisible,
+        "isFrom other"
+      );
       dispatch(addOrUpdateConversations([r.data]));
-
-      if (isFromOther && (!isActiveConv || !panelAtBottom || !isTabVisible)) {
-        const increment = r.data?.last_message.sender._id !== userId ? 1 : 0;
+      console.log("dönen chat", r.data);
+      if (
+        isFromOther &&
+        (!isActiveConv || !panelAtBottom || !isTabVisible) &&
+        r.data.last_message.message._id !== undefined
+      ) {
+        const increment = r.data?.last_message?.sender._id !== userId ? 1 : 0;
         if (increment === 1) {
           dispatch(
             incrementUnread({
@@ -430,8 +403,11 @@ const Chat = () => {
           );
         }
       }
-
-      if (isActiveConv && panelAtBottom && isTabVisible && isFromOther) {
+      console.log("yeni mesaj geldi");
+      console.log("karşı taraftan mı mesaj: ", isFromOther);
+      if (isFromOther) {
+        // panelAtBottom && isTabVisible && eski if içerideydi burası
+        console.log("socketa bildirildi.");
         socket.emit("message:delivered", {
           messageId: r.data?.last_message.message._id,
           conversationId: r.data._id,
@@ -440,6 +416,13 @@ const Chat = () => {
       }
       if (r.message === "send-message") {
         playNotificationSound();
+      }
+      console.log(r);
+      if (r.message === "group-created") {
+        console.log(r.data);
+        showNotification(
+          `🔔${r.data.createdBy.username} sizi "${r.data.name}" grubuna ekledi.`
+        );
       }
     };
 
@@ -465,7 +448,11 @@ const Chat = () => {
 
       <div className="chat-container container">
         {/* Chat Options */}
-        <div className="chat__options">
+        <div
+          className={`chat__options ${
+            !activeConversationId ? "is-visible" : ""
+          }`}
+        >
           <div className="__top">
             <div className="option">
               <button
@@ -537,6 +524,9 @@ const Chat = () => {
             status={status}
             messagesByConv={messagesByConv}
             socket={socket}
+            setActiveConversation={setActiveConversation}
+            showNotification={showNotification}
+            activeConversation={activeConversation}
           />
         )}
         {activePage === "friendRequests" && (
@@ -548,6 +538,7 @@ const Chat = () => {
           <ProfileSettings
             socket={socket}
             showNotification={showNotification}
+            activePage={activePage}
           />
         )}
         {/* Chat Panel */}
@@ -560,9 +551,11 @@ const Chat = () => {
             socket={socket}
             fetchingNew={fetchingNew} // 👈 yeni mesaj animasyonu için
             isOnline={isConnected}
+            setActiveConversation={setActiveConversation}
+            setactiveConversationId={setactiveConversationId}
           />
         ) : (
-          <SettingsPanel />
+          <SettingsPanel activePage={activePage} />
         )}
       </div>
       <button

@@ -25,12 +25,12 @@ const MainLayout = () => {
 
   const handleClick = () => {
     if (resetEnabled) {
+      console.log("girdi");
       dispatch(resetConversation());
       dispatch(resetMessages());
       dispatch(resetFile());
       dispatch(resetFriends());
       dispatch(resetAllPagination());
-      setResetEnabled(false);
     }
   };
 

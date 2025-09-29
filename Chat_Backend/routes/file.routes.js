@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import Message from "../models/Message.js"
 import Conversation from "../models/Conversation.js";
 import User from "../models/Users.js"
+import { getSignedUrlFromStorage } from "../utils/storage.js";
 dotenv.config();
 const router = express.Router();
 
@@ -65,24 +66,30 @@ router.get("/presigned-url/profile", async (req, res) => {
 });
 
 router.get("/presigned-url/group", async (req, res) => {
-  try {
-    const { fileType, conversationId } = req.query;
-    if (!fileType || !conversationId) {
-      return res.status(400).json({ error: "Eksik parametre" });
+   try {
+    const { fileType } = req.query; // ör: "image/png"
+    if (!fileType) {
+      return res.status(400).json({ success: false, message: "Dosya tipi gerekli" });
     }
-    const key = `group-images/${conversationId}/${fType(fileType)}/${generateUniqueFilename()}.${fileType.split("/")[1]}`;
+
+    const key = `avatars/${fType(fileType)}/${generateUniqueFilename()}.${fileType.split("/")[1]}`;
+
     const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
       ContentType: fileType,
     });
+  
     const uploadURL = await getSignedUrl(s3, command, { expiresIn: 60 }); // 60 saniye geçerli
-    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
-    return res.json({ uploadURL, fileUrl });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "URL alınamadı" });
+    res.json({
+      success: true,
+      uploadUrl: uploadURL, // 👈 dosyayı PUT ile buraya yükle
+      key,            // 👈 DB’de saklanacak
+    });
+  } catch (err) {
+    console.error("presigned avatar error:", err.message);
+    res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
 

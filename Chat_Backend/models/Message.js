@@ -9,7 +9,7 @@ const MessageSchema = new mongoose.Schema({
   type: { type: String, enum: ["text", "image", "video", "file", "call", "system"], required: true },
 
   // text mesajı
-  text: String,
+  text: {type:String},
 
   // medya bilgileri
   media_key: { type: String, default: "" },

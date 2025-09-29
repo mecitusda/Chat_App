@@ -1,24 +1,24 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
 
 const backgrounds = [
-  "bg1.jpg",
-  "bg2.jpg",
-  "bg3.jpg",
-  "bg4.jpg",
-  "bg5.jpg",
-  "bg6.jpg",
-  "bg7.jpg",
-  "bg8.jpg",
-  "bg9.jpg",
-  "bg10.jpg",
-  "bg11.jpg",
-  "bg12.jpg",
-  "bg13.jpg",
-  "bg14.jpg",
-  "bg15.jpg",
-  "bg16.jpg",
+  "bg1.webp",
+  "bg2.webp",
+  "bg3.webp",
+  "bg4.webp",
+  "bg5.webp",
+  "bg6.webp",
+  "bg7.webp",
+  "bg8.webp",
+  "bg9.webp",
+  "bg10.webp",
+  "bg11.webp",
+  "bg12.webp",
+  "bg13.webp",
+  "bg14.webp",
+  "bg15.webp",
+  "bg16.webp",
 ];
 
 export default function BackgroundSetting({ showNotification }) {
@@ -27,18 +27,18 @@ export default function BackgroundSetting({ showNotification }) {
   const currentColor = user?.settings?.chatBgColor || "#000000";
   const [showList, setShowList] = useState(false);
   const [loading, setLoading] = useState(false);
-
   const [visibleCount, setVisibleCount] = useState(5);
   const observerRef = useRef();
 
   const handleSelect = async (bgFilename) => {
     try {
       setLoading(true);
+      const fullImageUrl = `/backgrounds/${bgFilename}`;
       const res = await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/settings`,
         {
           userId: user._id,
-          chatBgImage: `/backgrounds/${bgFilename}`,
+          chatBgImage: fullImageUrl,
           chatBgColor: null,
         },
         { withCredentials: true }
@@ -49,12 +49,12 @@ export default function BackgroundSetting({ showNotification }) {
           ...prev,
           settings: {
             ...prev.settings,
-            chatBgImage: `/backgrounds/${bgFilename}`,
+            chatBgImage: fullImageUrl,
             chatBgColor: null,
           },
         }));
         setShowList(false);
-        showNotification("🔔Arka plan güncellendi.");
+        showNotification("🔔 Arka plan güncellendi.");
       }
     } catch (err) {
       console.error("Arka plan güncellenemedi:", err);
@@ -95,7 +95,6 @@ export default function BackgroundSetting({ showNotification }) {
     }
   };
 
-  // Lazy load için IntersectionObserver
   const lastThumbRef = useCallback(
     (node) => {
       if (loading) return;
@@ -103,7 +102,7 @@ export default function BackgroundSetting({ showNotification }) {
 
       observerRef.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && visibleCount < backgrounds.length) {
-          setVisibleCount((prev) => prev + 5); // her seferinde 5 tane daha
+          setVisibleCount((prev) => prev + 5);
         }
       });
 
@@ -135,15 +134,17 @@ export default function BackgroundSetting({ showNotification }) {
             <h4>Arka Plan Seç</h4>
             <div className="bg-thumb-list">
               {backgrounds.slice(0, visibleCount).map((bg, index) => {
-                const fullPath = `/backgrounds/${bg}`;
                 const isLast = index === visibleCount - 1;
+                const thumbPath = `/backgrounds/thumbs/${bg}`;
                 return (
-                  <div
+                  <img
                     key={bg}
                     ref={isLast ? lastThumbRef : null}
-                    className="bg-thumb"
-                    style={{ backgroundImage: `url(${fullPath})` }}
-                    onClick={() => handleSelect(bg)}
+                    src={thumbPath}
+                    alt={bg}
+                    loading="lazy"
+                    className="bg-thumb-img"
+                    onClick={() => handleSelect(`${bg.split(".")[0]}.jpg`)}
                   />
                 );
               })}

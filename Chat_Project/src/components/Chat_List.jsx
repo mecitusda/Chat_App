@@ -1,186 +1,3 @@
-// import React from "react";
-// import { FiWifiOff } from "react-icons/fi";
-// import { useMediaUrl } from "../hooks/useMediaUrl";
-// function formatSimpleTime(isoDateString) {
-//   if (isoDateString === "") {
-//     return "";
-//   }
-//   const now = new Date();
-//   const date = new Date(isoDateString);
-
-//   const isToday = now.toDateString() === date.toDateString();
-//   const yesterday = new Date(now);
-//   yesterday.setDate(now.getDate() - 1);
-//   const isYesterday = yesterday.toDateString() === date.toDateString();
-
-//   if (isToday) {
-//     return `${date.getHours().toString().padStart(2, "0")}:${date
-//       .getMinutes()
-//       .toString()
-//       .padStart(2, "0")}`;
-//   } else if (isYesterday) {
-//     return `Dün`;
-//   } else {
-//     const day = date.getDate().toString().padStart(2, "0");
-//     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-//     const year = date.getFullYear();
-//     return `${day}.${month}.${year}`;
-//   }
-// }
-
-// // ✅ Mesaj türünü anlamlı kısa bir metne çevir
-// function formatMessagePreview(conversation) {
-//   if (!conversation?.last_message) return "";
-//   let who = "";
-//   if (conversation.type === "group") {
-//     who = conversation?.members?.filter(
-//       (s) => s.user._id === conversation?.last_message?.message?.sender
-//     );
-//     who = who[0]?.user?.username + ": ";
-//   }
-
-//   switch (conversation?.last_message?.type) {
-//     case "text":
-//       return who + conversation.last_message.message?.text || "";
-//     case "image":
-//       return "🖼️ Görsel";
-//     case "video":
-//       return who + "🎥 Video";
-//     case "audio":
-//       return who + "🎵 Ses Kaydı";
-//     case "file":
-//     case "document":
-//       return who + "📎 Belge";
-//     case "sticker":
-//       return who + "💬 Sticker";
-//     case "gif":
-//       return who + "🎞️ GIF";
-//     default:
-//       return "Henüz mesaj gönderilmedi.";
-//   }
-// }
-
-// const ChatList = ({
-//   conversations,
-//   userId,
-//   setactiveConversationId,
-//   status,
-// }) => {
-//   //console.log(conversations);
-
-//   return (
-//     <div className="chat__list">
-//       <header className="list__header">
-//         <h2 className="list__title">Sohbetler</h2>
-
-//         {status === "connecting" || status === "reconnecting" ? (
-//           <div className="socket-connecting">
-//             <span className="spinner" />
-//             <span className="text">
-//               {status === "connecting" && "Sunucuya bağlanıyor…"}
-//               {status === "reconnecting" &&
-//                 "Bağlantı koptu, yeniden bağlanılıyor…"}
-//             </span>
-//           </div>
-//         ) : null}
-
-//         {status === "offline" && (
-//           <div className="socket-offline">
-//             <FiWifiOff className="offline-icon" />
-//             <span>Çevrimdışı</span>
-//           </div>
-//         )}
-
-//         <div className="list__buttons">
-//           <button className=" list__btn fa-solid fa-comment-medical"></button>
-//           <button className="list__btn fa-solid fa-ellipsis-vertical"></button>
-//         </div>
-//       </header>
-
-//       <div className="list__body">
-//         <div className="search-bar">
-//           <i className="fa-solid fa-magnifying-glass bar-icon"></i>
-//           <input
-//             type="text"
-//             placeholder="Search or start new chat"
-//             className="bar-input"
-//             name="search"
-//           />
-//         </div>
-
-//         <div className="filters">
-//           <button className="btn-dark active">Tümü</button>
-//           <button className="btn-dark">Okunmamış</button>
-//           <button className="btn-dark">Favoriler</button>
-//           <button className="btn-dark">Gruplar</button>
-//         </div>
-
-//         <ul className="chat__items">
-//           {conversations.map((conversation, index) => {
-//             const lastMsg = conversation.last_message;
-//             return (
-//               <li
-//                 className="chat__item"
-//                 key={index}
-//                 onClick={() => setactiveConversationId(conversation._id)}
-//               >
-//                 <img
-//                   src={
-//                     conversation.type === "private"
-//                       ? conversation.members[0].user._id === userId
-//                         ? conversation.members[1].user.avatar
-//                           ? useMediaUrl(conversation.members[1].user.avatar)
-//                           : "https://avatar.iran.liara.run/public/1"
-//                         : conversation.members[0].user.avatar
-//                         ? useMediaUrl(conversation.members[0].user.avatar)
-//                         : "https://avatar.iran.liara.run/public/1"
-//                       : conversation.avatar
-//                       ? useMediaUrl(conversation.avatar)
-//                       : "https://avatar.iran.liara.run/public/1"
-//                   }
-//                   alt="User"
-//                   className="chat__avatar"
-//                 />
-
-//                 <div className="chat__info">
-//                   <h3 className="chat__name">
-//                     {conversation.type === "private"
-//                       ? conversation.members[0].user._id === userId
-//                         ? conversation.members[1].user.username
-//                         : conversation.members[0].user.username
-//                       : conversation.name}
-//                   </h3>
-//                   <p className="chat__message">
-//                     {formatMessagePreview(conversation)}
-//                   </p>
-//                 </div>
-
-//                 <div className="chat__time">
-//                   <span>
-//                     {formatSimpleTime(
-//                       lastMsg?.message?.updatedAt || lastMsg?.updatedAt || ""
-//                     )}
-//                   </span>
-//                   <div
-//                     className={`chat__unread ${
-//                       conversation.unread === 0 ? "is-hidden" : ""
-//                     }`}
-//                   >
-//                     <div className="sayi">{conversation.unread}</div>
-//                   </div>
-//                 </div>
-//               </li>
-//             );
-//           })}
-//         </ul>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default ChatList;
-
-// ChatList.jsx
 import React, {
   useEffect,
   useMemo,
@@ -191,16 +8,15 @@ import React, {
 } from "react";
 import { FiWifiOff } from "react-icons/fi";
 import { useMediaUrl } from "../hooks/useMediaUrl";
-import { useUser } from "../contextAPI/UserContext";
 import DropdownMenu from "./DropdownMenu";
-
+import { useUser } from "../contextAPI/UserContext";
+import { useSelector } from "react-redux";
 // ==== helpers ====
 const MAX_SCAN_MSGS = 60; // içerik aramada taranacak mesaj sayısı (son N)
 const norm = (s) => (s || "").toString().toLowerCase();
 const trimSpaces = (s) => (s || "").toString().trim();
 const EMPTY = [];
 const FALLBACK_AVATAR = "/images/default-avatar.jpg";
-
 function formatSimpleTime(iso) {
   if (!iso) return "";
   const now = new Date();
@@ -218,27 +34,6 @@ function formatSimpleTime(iso) {
     .toString()
     .padStart(2, "0")}.${d.getFullYear()}`;
 }
-
-function formatMessagePreview(conversation) {
-  if (!conversation?.last_message) return "";
-  const type = conversation.last_message.type;
-  const senderId = conversation?.last_message?.message?.sender;
-  let who = "";
-  if (conversation.type === "group") {
-    const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
-    who = mem?.user?.username ? `${mem.user.username}: ` : "";
-  }
-  if (type === "text")
-    return who + (conversation.last_message.message?.text || "");
-  if (type === "image") return who + "🖼️ Görsel";
-  if (type === "video") return who + "🎥 Video";
-  if (type === "audio") return who + "🎵 Ses Kaydı";
-  if (type === "file" || type === "document") return who + "📎 Belge";
-  if (type === "sticker") return who + "💬 Sticker";
-  if (type === "gif") return who + "🎞️ GIF";
-  return "Henüz mesaj gönderilmedi.";
-}
-
 function highlight(text, q) {
   const t = text ?? "";
   const qq = trimSpaces(q);
@@ -256,7 +51,6 @@ function highlight(text, q) {
     </>
   );
 }
-
 // ====== alt bileşen: her satır ======
 const ChatListItem = memo(function ChatListItem({
   conversation,
@@ -272,10 +66,8 @@ const ChatListItem = memo(function ChatListItem({
     (conversation.members?.[0]?.user?._id === userId
       ? conversation.members?.[1]?.user
       : conversation.members?.[0]?.user);
-  const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar.url;
-
+  const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar?.url;
   const lastMsg = conversation.last_message;
-
   return (
     <li className="chat__item" onClick={() => onSelect(conversation._id)}>
       <img
@@ -283,7 +75,6 @@ const ChatListItem = memo(function ChatListItem({
         alt="User"
         className="chat__avatar"
       />
-
       <div className="chat__info">
         <h3 className="chat__name">
           {query ? highlight(title, query) : title}
@@ -292,7 +83,6 @@ const ChatListItem = memo(function ChatListItem({
           {query ? highlight(preview, query) : preview}
         </p>
       </div>
-
       <div className="chat__time">
         <span>
           {formatSimpleTime(
@@ -310,28 +100,49 @@ const ChatListItem = memo(function ChatListItem({
     </li>
   );
 });
-
 // ========= ANA LISTE =========
 export default function ChatList({
   conversations = EMPTY,
   messagesByConv = {}, // <-- YENİ
   userId,
   setactiveConversationId,
-  activeConversationId,
+  setActiveConversation,
+  activeConversation,
   status,
   socket,
+  showNotification,
+  activeConversationId,
 }) {
   // search state
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const inputRef = useRef(null);
   const { user } = useUser();
+  const { friends } = useSelector((state) => state.friends);
+  function formatMessagePreview(conversation) {
+    if (!conversation?.last_message) return "";
+    const type = conversation.last_message?.type;
+    const senderId = conversation?.last_message?.message?.sender;
+    let who = "";
+    if (conversation.type === "group") {
+      const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
+      if (!mem) return (who = "");
+      who = mem?.user._id !== user?._id ? `${mem?.user.username}: ` : "Sen: ";
+    }
+    if (type === "text")
+      return who + (conversation?.last_message?.message?.text || "");
+    if (type === "image") return who + "🖼️ Görsel";
+    if (type === "video") return who + "🎥 Video";
+    if (type === "audio") return who + "🎵 Ses Kaydı";
+    if (type === "file" || type === "document") return who + "📎 Belge";
+    if (type === "sticker") return who + "💬 Sticker";
+    if (type === "gif") return who + "🎞️ GIF";
+    return "Henüz mesaj gönderilmedi.";
+  }
   useEffect(() => {
     if (!socket || !conversations?.length || !user?._id) return;
     const now = Date.now();
-
     const expiredConvAvatars = [];
-
     conversations.forEach((conv) => {
       if (conv.type === "group") {
         // Grup → sadece conversation avatarını kontrol et
@@ -350,7 +161,6 @@ export default function ChatList({
         const otherMember = conv.members.find(
           (m) => String(m.user._id) !== String(user._id)
         );
-
         if (
           otherMember?.user?.avatar?.url &&
           (!otherMember.user.avatar.url_expiresAt ||
@@ -364,19 +174,16 @@ export default function ChatList({
         }
       }
     });
-
     if (expiredConvAvatars.length > 0) {
       //console.log("süresi dolanlar: ", expiredConvAvatars);
       socket.emit("refresh-conversation-avatars", expiredConvAvatars);
     }
   }, [socket, conversations, user?._id]);
-
   // debounce
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 200);
     return () => clearTimeout(t);
   }, [query]);
-
   // kısayollar
   useEffect(() => {
     const onKey = (e) => {
@@ -391,7 +198,6 @@ export default function ChatList({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [query]);
-
   // title helper
   const getTitle = useCallback(
     (c) => {
@@ -407,11 +213,58 @@ export default function ChatList({
     [userId]
   );
 
+  const filteredFriends = useMemo(() => {
+    const q = trimSpaces(debounced).toLowerCase();
+    if (!q) return [];
+    // Sohbeti zaten var olan kullanıcıları bul
+    const existingChatUserIds = conversations
+      .filter((c) => c.type === "private")
+      .map(
+        (c) =>
+          c.members.find((m) => String(m.user._id) !== String(userId))?.user._id
+      );
+    return friends
+      .filter(
+        (f) =>
+          f._id !== userId &&
+          !existingChatUserIds.includes(String(f._id)) && // ✅ zaten sohbeti olanları çıkar
+          (f.username.toLowerCase().includes(q) ||
+            f.phone?.toLowerCase().includes(q))
+      )
+      .map((f) => ({
+        _id: `friend-${f._id}`,
+        friend: f,
+      }));
+  }, [debounced, friends, conversations, userId]);
+
   // içerik araması + snippet üretimi
+
+  // === Mesaj arama ===
+  const filteredMessages = useMemo(() => {
+    const q = trimSpaces(debounced).toLowerCase();
+    if (!q) return [];
+    const results = [];
+    for (const c of conversations) {
+      const msgs = (messagesByConv[c._id] || EMPTY).slice(-MAX_SCAN_MSGS);
+      for (const m of msgs) {
+        if (m?.type === "text" && m?.text.toLowerCase().includes(q)) {
+          results.push({
+            conv: c,
+            msg: m,
+          });
+        }
+      }
+    }
+    return results;
+  }, [debounced, conversations, messagesByConv]);
+
+  const messageMatchedConvIds = new Set(
+    filteredMessages.map((r) => r.conv._id)
+  );
+
   const filteredWithPreview = useMemo(() => {
     const q = trimSpaces(debounced);
     if (!q) {
-      // query yoksa isim + son mesajı döndür
       return conversations.map((c) => ({
         conv: c,
         title: getTitle(c),
@@ -426,91 +279,32 @@ export default function ChatList({
       const title = getTitle(c);
       const lastPreview = formatMessagePreview(c);
 
-      // grupsa üye isimlerini de indexe kat
-      const memberNames =
-        c.type === "group"
-          ? (c.members || []).map((m) => m?.user?.username || "").join(" ")
-          : "";
-
-      // önce hızlı alanlarda ara
-      const hayTitle = norm(title);
-      const hayLast = norm(lastPreview);
-      const hayMembers = norm(memberNames);
-
-      let matched = false;
-      let snippet = "";
-
       if (
-        hayTitle.includes(qn) ||
-        hayLast.includes(qn) ||
-        (memberNames && hayMembers.includes(qn))
+        (norm(title).includes(qn) || norm(lastPreview).includes(qn)) &&
+        !messageMatchedConvIds.has(c._id) // 👈 Eğer mesajlarda bulunduysa Sohbetler’e ekleme
       ) {
-        matched = true;
-        // title veya last’tan snippet
-        if (hayLast.includes(qn)) snippet = lastPreview;
-        else snippet = title;
-      } else {
-        // içerikte ara (son N mesaj)
-        const msgs = (messagesByConv[c._id] || EMPTY).slice(-MAX_SCAN_MSGS);
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          const m = msgs[i];
-          if (m?.type === "text" && m?.text) {
-            const txt = m.text.toString();
-            if (norm(txt).includes(qn)) {
-              matched = true;
-              // snippet: eşleşmeyi ortala
-              const idx = norm(txt).indexOf(qn);
-              const start = Math.max(0, idx - 24);
-              const end = Math.min(txt.length, idx + q.length + 24);
-              snippet =
-                (start > 0 ? "…" : "") +
-                txt.slice(start, end) +
-                (end < txt.length ? "…" : "");
-              break;
-            }
-          } else if (m?.type && m.type !== "text") {
-            // medya tiplerini anahtar kelimeye çevir
-            const mediaWord =
-              m.type === "image"
-                ? "görsel"
-                : m.type === "video"
-                ? "video"
-                : m.type === "audio"
-                ? "ses"
-                : m.type === "file" || m.type === "document"
-                ? "belge"
-                : m.type;
-            if (norm(mediaWord).includes(qn)) {
-              matched = true;
-              snippet = `(${mediaWord})`;
-              break;
-            }
-          }
-        }
-      }
-
-      if (matched) {
-        results.push({
-          conv: c,
-          title,
-          preview: snippet || lastPreview || "",
-        });
+        results.push({ conv: c, title, preview: lastPreview });
       }
     }
-
     return results;
-  }, [debounced, conversations, messagesByConv, getTitle]);
-
-  const onSelect = useCallback(
-    (id) => setactiveConversationId(id),
-    [activeConversationId]
-  );
-
+  }, [debounced, conversations, getTitle, messageMatchedConvIds]);
+  // === Seçim ===
+  const onSelectConversation = (id) => setactiveConversationId(id);
+  const onSelectFriend = (friend) => {
+    setactiveConversationId(null); // daha yok
+    setActiveConversation({
+      type: "private",
+      members: [
+        { user: { _id: user._id, username: user.username } },
+        { user: friend },
+      ],
+      isPending: true, // ✅ sohbet henüz DB’de yok
+    });
+  };
   return (
-    <div className="chat__list">
+    <div className={`chat__list ${!activeConversationId ? "is-visible" : ""}`}>
       <header className="list__header">
         <h2 className="list__title">Sohbetler</h2>
-
         {status === "connecting" || status === "reconnecting" ? (
           <div className="socket-connecting">
             <span className="spinner" />
@@ -521,25 +315,21 @@ export default function ChatList({
             </span>
           </div>
         ) : null}
-
         {status === "offline" && (
           <div className="socket-offline">
             <FiWifiOff className="offline-icon" />
             <span>Çevrimdışı</span>
           </div>
         )}
-
         <div className="list__buttons">
           <div className="disabled-tip">
             <button className=" list__btn fa-solid fa-comment-medical"></button>
           </div>
-
           <div className="list__btn">
-            <DropdownMenu />
+            <DropdownMenu socket={socket} showNotification={showNotification} />
           </div>
         </div>
       </header>
-
       <div className="list__body">
         {/* Searchbar */}
         <div className={`search-bar ${query ? "has-value" : ""}`}>
@@ -568,7 +358,6 @@ export default function ChatList({
           )}
           <kbd className="kbd-shortcut">⌘K</kbd>
         </div>
-
         {/* Filtreler placeholder */}
         <div className="filters">
           <button className="btn-dark active">Tümü</button>
@@ -576,25 +365,87 @@ export default function ChatList({
           <button className="btn-dark">Favoriler</button>
           <button className="btn-dark">Gruplar</button>
         </div>
-
-        {/* Liste */}
-        <ul className="chat__items">
-          {filteredWithPreview.map(({ conv, title, preview }) => (
-            <ChatListItem
-              key={conv._id}
-              conversation={conv}
-              userId={userId}
-              onSelect={onSelect}
-              title={title}
-              preview={preview}
-              query={query}
-            />
-          ))}
-        </ul>
-
-        {filteredWithPreview.length === 0 && (
-          <div className="chat__empty">
-            {trimSpaces(query) ? "Eşleşen sonuç yok." : "Sohbet yok."}
+        {/* === 2) Kişiler === */}
+        {filteredFriends.length > 0 && (
+          <div className="search-section">
+            <h4>Kişiler</h4>
+            <ul className="chat__items">
+              {filteredFriends.map((f) => (
+                <li
+                  key={f._id}
+                  className="chat__item -friend"
+                  onClick={() => onSelectFriend(f.friend)}
+                >
+                  <img
+                    src={f.friend.avatar?.url || FALLBACK_AVATAR}
+                    alt={f.friend.username}
+                    className="chat__avatar"
+                  />
+                  <div className="chat__info">
+                    <h3 className="chat__name">
+                      {highlight(f.friend.username, query)}
+                    </h3>
+                    <p className="chat__message">
+                      {f.friend.about || "Arkadaş"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {/* === 1) Sohbetler === */}
+        {filteredWithPreview.length > 0 && (
+          <div className="search-section">
+            <ul className="chat__items">
+              {filteredWithPreview.map(({ conv }) => (
+                <ChatListItem
+                  key={conv._id}
+                  conversation={conv}
+                  userId={userId}
+                  onSelect={onSelectConversation}
+                  title={
+                    conv.type === "private"
+                      ? (conv.members?.[0]?.user?._id === userId
+                          ? conv.members?.[1]?.user
+                          : conv.members?.[0]?.user
+                        )?.username
+                      : conv.name
+                  }
+                  preview={formatMessagePreview(conv)}
+                  query={query}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+        {/* === 3) Mesajlar === */}
+        {filteredMessages.length > 0 && (
+          <div className="search-section">
+            <h4>Mesajlar</h4>
+            <ul className="chat__items">
+              {filteredMessages.map(({ conv, msg }) => (
+                <li
+                  key={msg._id}
+                  className="chat__item -message"
+                  onClick={() => onSelectConversation(conv._id)}
+                >
+                  <div className="chat__info">
+                    <h3 className="chat__name">
+                      {conv.type === "private"
+                        ? (conv.members?.[0]?.user?._id === userId
+                            ? conv.members?.[1]?.user
+                            : conv.members?.[0]?.user
+                          )?.username
+                        : conv.name}
+                    </h3>
+                    <p className="chat__message">
+                      {highlight(msg.text, query)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
