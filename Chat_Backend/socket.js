@@ -103,7 +103,7 @@ async function getLastSeen(userId) {
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173","https://qbh9xq6w-5173.euw.devtunnels.ms"], // Geliştirme için, prod’da domain belirt
+    origin: ["http://localhost:5173","https://qbh9xq6w-5173.euw.devtunnels.ms","http://localhost:5173"], // Geliştirme için, prod’da domain belirt
     methods: ["GET", "POST"],
     credentials: true,
   },

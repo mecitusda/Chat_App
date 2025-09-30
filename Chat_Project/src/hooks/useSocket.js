@@ -27,7 +27,7 @@ export const getPeerIdsFromConversation = (c, meId) => {
     .filter(uid => uid && uid !== my);
 };
 
-export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,dispatch) {
+export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,friends,dispatch) {
   //const dispatch = useDispatch();
   const [status, setStatus] = useState("connecting");
   const { user } = useUser();
@@ -57,20 +57,21 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
   for (const conv of payload.conversations) {
     if(conv.unread > 0){
       dispatch(setUnread({ conversationId: conv._id, by: conv.unread }));
-    }
-    for (const uid of getPeerIdsFromConversation(conv, userId)) {
-      allPeers.add(uid);
-    }
   }
-  const ids = Array.from(allPeers);
-  if (ids.length) {
-    socket.emit("presence:subscribe", { userIds: ids });
-    socket.emit("presence:who", { userIds: ids }, (map) => {
-      // map: { [userId]: { online, lastSeen } }
-      dispatch(setPresenceBulk(map));
-    });
+  // for (const uid of getPeerIdsFromConversation(conv, userId)) {
+  //     allPeers.add(uid);
+  // }
   }
-    upsertProfileAvatars(list, userId, dispatch,store.getState);
+  // const ids = Array.from(allPeers);
+  // if (ids.length) {
+  //   socket.emit("presence:subscribe", { userIds: ids });
+  //   socket.emit("presence:who", { userIds: ids }, (map) => {
+  //     // map: { [userId]: { online, lastSeen } }
+  //     dispatch(setPresenceBulk(map));
+  //   });
+  // }
+
+  upsertProfileAvatars(list, userId, dispatch,store.getState);
 
  
     };
@@ -88,7 +89,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
     const onReconnectAttempt = () => setStatus("reconnecting");
     const onReconnectFailed = () => setStatus("offline");
 
-    socket.on("presence:update", (p) => dispatch(setPresence(p)));
+    socket.on("presence:update", (p) =>dispatch(setPresence(p)));
     socket.on("chatList", onChatList);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -111,19 +112,22 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
   useEffect(() => {
     if (!socket || !userId) return;
 
-    const peerIds = conversations
-      .map(c => getPeerIdsFromConversation(c, userId))
-      .filter(Boolean);
+    const convPeerIds = conversations
+    .flatMap(c => getPeerIdsFromConversation(c, userId))
+    .filter(Boolean);
+    const friendIds = (friends || []).map(f => f?._id).filter(Boolean);;
 
-    if (peerIds.length === 0) return;
-    socket.emit("presence:subscribe", { userIds: peerIds });
-    socket.emit("presence:who", { userIds: peerIds }, (map) => {
+  // Tekrarları silmek için Set kullanıyoruz
+    const ids = Array.from(new Set([...convPeerIds, ...friendIds]));
+    if (ids.length === 0) return;
+    socket.emit("presence:subscribe", { userIds: ids });
+    socket.emit("presence:who", { userIds: ids }, (map) => {
       // map: { [userId]: {online, lastSeen} }
       dispatch(setPresenceBulk(map));
     });
 
     // (opsiyonel) sayfadan çıkarken unsubscribe
-    return () => socket.emit("presence:unsubscribe", { userIds: peerIds });
+    return () => socket.emit("presence:unsubscribe", { userIds: ids });
   }, [socket, userId, conversations, dispatch]);
 
 

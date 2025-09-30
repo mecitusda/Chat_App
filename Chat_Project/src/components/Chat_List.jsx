@@ -175,7 +175,7 @@ export default function ChatList({
       }
     });
     if (expiredConvAvatars.length > 0) {
-      //console.log("süresi dolanlar: ", expiredConvAvatars);
+      console.log("süresi dolanlar: ", expiredConvAvatars);
       socket.emit("refresh-conversation-avatars", expiredConvAvatars);
     }
   }, [socket, conversations, user?._id]);
@@ -293,6 +293,7 @@ export default function ChatList({
   const onSelectFriend = (friend) => {
     setactiveConversationId(null); // daha yok
     setActiveConversation({
+      _id: "_temp",
       type: "private",
       members: [
         { user: { _id: user._id, username: user.username } },

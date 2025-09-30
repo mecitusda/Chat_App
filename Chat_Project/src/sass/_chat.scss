@@ -7,14 +7,12 @@
     flex-wrap: nowrap;
     height: 100vh;  //95 eski datalar.
     width: 100vw;   //85
-    overflow-y: hidden;
     //margin-top: 2.5rem;
     .chat{ 
          &__options{
              background-color: variables.$settings-backend;
              color: rgb(127, 129, 133);
-             max-width: 65px;
-             width: 4.06%;
+             width: 4.06vw;
              border-right: 1px solid #2d3e47;
              padding: 1rem 1.2rem;
              display: flex;
@@ -28,7 +26,27 @@
                gap: 1.5rem;
                padding: 1rem 0;
                margin: 0 auto;
-            
+               position: relative;
+               .fa-request{
+                  position: relative;
+                  margin-top: 1rem;
+                  cursor: pointer;
+                  .count{
+                 
+                     font-size: .9rem;
+                     padding: 0.2rem 0.6rem;
+                     border-radius: 50%;
+                     background-color: variables.$notification-color;
+                     position: absolute;
+                     color: variables.$dark-color;
+                     top: -.5rem;
+                     right: -1.3rem;
+                   }
+                 &::before{
+                   font-size: 1.6rem;
+                   padding: 1rem;
+                 }
+                 }
                button{
                  border: none;
                  background: none;
@@ -37,7 +55,7 @@
                  cursor: pointer;
                  &.fa-message{
                    position: relative;
-                   left: -8px;
+                   left: -.8rem;
                    .count{
                      font-size: 1rem;
                      padding: 0.2rem 0.5rem;
@@ -51,25 +69,6 @@
                  &::before{
                    background-color: #374248;
                    border-radius: 50%;
-                   font-size: 1.6rem;
-                   padding: 1rem;
-                 }
-                 }
-                 &.fa-request{
-                   margin-top: 1rem;
-                   position: relative;
-                   left: -8px;
-                   .count{
-                     font-size: 1rem;
-                     padding: 0.2rem 0.5rem;
-                     border-radius: 1rem;
-                     background-color: variables.$notification-color;
-                     position: absolute;
-                     color: variables.$dark-color;
-                     top: -.5rem;
-                     right: -22px;
-                   }
-                 &::before{
                    font-size: 1.6rem;
                    padding: 1rem;
                  }
@@ -89,18 +88,30 @@
                  font-size: 2.6rem;
                }
                  button{
-                 border: none;
-                 background: none;
-                 color: variables.$button-color;
-                 font-size: 1.6rem;
-                 cursor: pointer;
+                  border: none;
+                  background: none;
+                  color: variables.$button-color;
+                  font-size: 1.6rem;
+                  cursor: pointer;
+                 }
+                 .profile-btn{
+                  border-radius: 50%;
+                  background-color: variables.$dark-color!important;
+                  padding: .5rem;
+                  background: none;
+                  color: variables.$button-color;
+                  font-size: 3.5rem;
+                  cursor: pointer;
                  }
                }
+             }
+             .active{
+              color:variables.$light-color!important
              }
          }
         &__list{
             background-color: variables.$settings-backend;
-            width: 30.53%;
+            width: 30.53vw;
             display: flex;
             flex-direction: column;
             border-right: 1px solid #2d3e47;
@@ -442,7 +453,7 @@
           background-color: #1E1E1E;
           //border-right: 3px solid hsl(201, 22%, 23%); eski data
           position: relative;
-          width: 66.41%;
+          width: 65.31vw;
           height: 100%;
           display: flex;
           flex-direction: column;
@@ -1200,72 +1211,7 @@
 
 
 
-// @media (max-width: 576px) {
-//     .chat{
-//     &__container{
-//       height: 100vh;//98
-//       width: 100% !important;//99
-//       display: none;
-//     }
-//     &__messages{
-//       width: 100%;
-//       position: relative;
-//       padding: 1rem 2.8rem !important;
-//       .message{
-//         max-width: 80% !important;
-//         padding: .9rem .8rem .6rem .8rem !important;
-//         border-radius: 10px 10px 0 10px !important;
-//         margin: 4px 0 !important;
-//       }
-//     }   
 
-//     &__item{
-//       height: 8rem !important;
-//       padding: .6rem 0 !important;
-//     }
-//     &__avatar{
-//       width: 4.5rem !important;
-//       height:4.5rem !important;
-//       border-radius: 50% !important;
-//       flex-shrink: 0 !important;
-//       padding: .1rem !important;
-//       margin-left:.4rem !important;
-//     }
-//     &__info{
-//       padding: 0 .1rem 0 .5rem !important;
-//       .chat__name{
-//       font-size: 1.7rem !important;
-//       }
-//       .chat__message{
-//       font-size: 1.3rem !important;
-//       font-weight: 500!important;
-//       }            
-//     }
-
-//     &__time{
-//       padding: 0 !important;
-//       width: 16%;
-//       span{
-//         width: 100%!important;
-//         padding: 0!important;
-//         margin: 0 !important;
-//         font-size: 1.1rem !important;
-//       }
-//     }
-
-//     &__options{
-//       width: 7%!important;
-//     }
-    
-//     &__list{
-//       width: 36%!important;
-//     }
-
-//     &__panel{
-//       width: 57%!important;
-//     }
-//   }
-// }
 
 @media (max-width: 768px) {
  .reset{display: none!important}
@@ -2132,6 +2078,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 
 .bg-modal {
   background: white;
+  justify-content: center;
   padding: 2rem;
   border-radius: 1rem;
   max-width: 1000px;
@@ -2147,6 +2094,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  justify-content: center;
   margin: 1rem 0;
   max-height: 80vh;
   height: 92%;
@@ -2168,10 +2116,9 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   top: 12px;
   right: 12px;
   background: transparent;
-  border: 2px solid black;
   border-radius: 100%;
   padding: 3px;
-  font-size: 1.5rem;
+  font-size: 2.5rem;
   color: #000000;
   cursor: pointer;
   z-index: 1000;

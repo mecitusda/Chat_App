@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from "react";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
-
+import { MdClose } from "react-icons/md";
+import LazyImage from "./LazyImage";
 const backgrounds = [
   "bg1.webp",
   "bg2.webp",
@@ -114,7 +115,6 @@ export default function BackgroundSetting({ showNotification }) {
   return (
     <div className="bg-setting">
       <h3>Arka Plan Ayarı</h3>
-
       <div
         className="bg-preview"
         onClick={() => setShowList(true)}
@@ -124,27 +124,27 @@ export default function BackgroundSetting({ showNotification }) {
         }}
         title="Arka planı değiştirmek için tıklayın"
       />
-
       {showList && (
         <div className="bg-overlay">
           <div className="bg-modal">
-            <button className="bg-close-btn" onClick={() => setShowList(false)}>
-              ×
-            </button>
+            <MdClose
+              className="bg-close-btn"
+              onClick={() => setShowList(false)}
+            />
             <h4>Arka Plan Seç</h4>
             <div className="bg-thumb-list">
               {backgrounds.slice(0, visibleCount).map((bg, index) => {
                 const isLast = index === visibleCount - 1;
                 const thumbPath = `/backgrounds/thumbs/${bg}`;
+                const fullPath = `/backgrounds/${bg}`;
                 return (
-                  <img
+                  <LazyImage
                     key={bg}
-                    ref={isLast ? lastThumbRef : null}
-                    src={thumbPath}
+                    thumbSrc={thumbPath}
+                    fullSrc={fullPath}
                     alt={bg}
-                    loading="lazy"
-                    className="bg-thumb-img"
-                    onClick={() => handleSelect(`${bg.split(".")[0]}.jpg`)}
+                    onClick={() => handleSelect(bg)}
+                    observe={isLast ? lastThumbRef : null}
                   />
                 );
               })}
@@ -161,7 +161,6 @@ export default function BackgroundSetting({ showNotification }) {
           </div>
         </div>
       )}
-
       {loading && <p>Güncelleniyor...</p>}
     </div>
   );

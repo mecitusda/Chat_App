@@ -2,19 +2,27 @@ import React, { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { selectPresence } from "../slices/presenceSlice";
 import { FiArrowLeft } from "react-icons/fi"; // Feather
+
 function formatLastSeen(ts) {
-  if (!ts || typeof ts !== "number" || isNaN(ts)) {
+  if (!ts) return "Çevrimdışı";
+
+  let d;
+  if (typeof ts === "number") {
+    d = new Date(ts);
+  } else if (typeof ts === "string") {
+    d = new Date(ts); // ISO string de parse edilir
+  } else if (ts instanceof Date) {
+    d = ts;
+  } else {
     return "Çevrimdışı";
   }
-  const d = new Date(ts);
-  return `son görülme ${
-    ts
-      ? d.toLocaleTimeString("tr-TR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : ""
-  }`;
+
+  if (isNaN(d.getTime())) return "Çevrimdışı";
+
+  return `son görülme ${d.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 const ChatPanel_Header = ({
@@ -50,6 +58,7 @@ const ChatPanel_Header = ({
       .filter((m) => presencesByUser?.[m.user._id]?.online)
       .map((m) => m.user?.username || "Bilinmeyen");
   }, [activeConversation, userId, presencesByUser]);
+
   //console.log(groupOnlineNames);
   // Status metni:
   const statusText =

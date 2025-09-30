@@ -14,7 +14,7 @@ import {
   addOrUpdateConversations,
   incrementUnread,
 } from "../slices/conversationSlice";
-
+import { MdGroup, MdPerson } from "react-icons/md";
 // Messages
 import { addOrUpdateMessages, applyMessageAck } from "../slices/messageSlice";
 
@@ -62,6 +62,8 @@ const Chat = () => {
   const filesByConv = useSelector((s) => s.files?.byKey || {});
   const { requests, friends } = useSelector((state) => state.friends);
   const uis = useSelector((s) => s.ui.atBottomByConv || []);
+  const pres = useSelector((state) => state.presences.byUser);
+  //console.log("pres: ", pres);
   //console.log("arkadaşlar: ", friends);
   //console.log("chatler: ", conversations);
   //console.log("files: ", filesByConv);
@@ -73,13 +75,13 @@ const Chat = () => {
 
   // Yeni mesaj (after) fetch animasyonu için
   const [fetchingNew, setFetchingNew] = useState(false);
-
   // Socket
   const { socket, status, isConnected } = useSocket(
     SOCKET_URL,
     userId,
     addOrUpdateConversations,
     conversations,
+    friends,
     dispatch
   );
 
@@ -308,6 +310,7 @@ const Chat = () => {
     };
 
     const handleUpdatedAvatars = ({ updates }) => {
+      console.log("updates: ", updates);
       // updates: [{ type, conversationId, avatar }, { type, conversationId, userId, avatar }]
       dispatch(updateConversationAvatars(updates));
     };
@@ -342,8 +345,9 @@ const Chat = () => {
 
     const existing = messagesByConv[convId] || [];
 
-    if (existing.length === 0) {
+    if (existing.length === 0 && !activeConversation._id.startsWith("_temp")) {
       // İlk kez açılıyor → en yeni mesajları çek
+
       socket.emit("messages", { conversationId: convId, limit: 20 });
       // after guard’ını sıfırla
       lastAfterSentRef.current[convId] = null;
@@ -450,13 +454,15 @@ const Chat = () => {
         {/* Chat Options */}
         <div
           className={`chat__options ${
-            !activeConversationId ? "is-visible" : ""
+            !activeConversation?._id ? "is-visible" : ""
           }`}
         >
           <div className="__top">
             <div className="option">
               <button
-                className="fa-solid fa-message"
+                className={`fa-solid fa-message ${
+                  activePage !== "chatList" ? "" : "active"
+                }`}
                 id="option1"
                 onClick={handleOption1Click}
               >
@@ -464,15 +470,19 @@ const Chat = () => {
               </button>
             </div>
             <div className="option">
-              <button
-                className="fa-solid fa-bullseye fa-request"
-                id="option2"
-                onClick={handleFriendRequests}
-              >
+              <div className={`fa-request`}>
+                <MdGroup
+                  id="option2"
+                  color="#A9B5BB"
+                  onClick={handleFriendRequests}
+                  className={`${
+                    activePage !== "friendRequests" ? "" : "active"
+                  }`}
+                ></MdGroup>
                 {requests.length > 0 ? (
                   <span className="count">{requests.length}</span>
                 ) : null}
-              </button>
+              </div>
             </div>
             <div className="option">
               <div className="disabled-tip">
@@ -505,11 +515,13 @@ const Chat = () => {
             </div>
 
             <div className="option">
-              <button
-                className="btn-dark fa-solid fa-circle-user"
+              <MdPerson
+                className={`profile-btn ${
+                  activePage !== "profileSettings" ? "" : "active"
+                }`}
                 id="option6"
                 onClick={handleSettings}
-              />
+              ></MdPerson>
             </div>
           </div>
         </div>
