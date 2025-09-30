@@ -166,7 +166,7 @@ router.post("/presigned-url/avatars", async (req, res) => {
   try {
     const { expiredAvatars } = req.body; // [{conversationId, type}, {userId, conversationId, type}]
     const results = [];
-
+    console.log(expiredAvatars)
     for (const item of expiredAvatars) {
       if (item.type === "conversation") {
         const conv = await Conversation.findById(item.conversationId).select("avatar");

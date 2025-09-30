@@ -10,14 +10,7 @@ const redis = new Redis(process.env.REDIS_URL);
 
 // örn: redis://localhost:6379
 
-async function setLastSeen(userId, timestamp) {
-  await redis.set(`last_seen:${userId}`, timestamp);
-}
 
-async function getLastSeen(userId) {
-  const ts = await redis.get(`last_seen:${userId}`);
-  return ts ? Number(ts) : null;
-}
 
 
 
@@ -28,35 +21,10 @@ const server = createServer(app);
 
 const TYPING_TTL_MS = 6000; // 6 sn sonra otomatik "durdu" varsay
 
-//status
-const socketsByUser = new Map(); // userId -> Set<socketId>
 
-
-// const getLastSeens = async () => {
-//   setTimeout(async()=> {
-//   await axios.get(`${BACKEND_URL}/api/conversation/last-seen`).then((response)=>{
-//     Object.entries(response.data.lastSeen).forEach(([userId,isoDate])=>{
-//        const timestamp = new Date(isoDate).getTime();
-//   if (!isNaN(timestamp)) {
-//     lastSeenByUser.set(userId, timestamp);
-//   } else {
-//     console.warn(`Invalid date for user ${userId}: ${isoDate}`);
-//   }
-//     })
-//   })
-//   console.log("son görülme güncellendi.")
-//   },1000)
-// }
-
-//getLastSeens();
-//typing
 const typingTimers = new Map();
 
-// Helpers
-async function emitPresence(userId, online) {
-  const payload = { userId, online, lastSeen: online ? undefined : await getLastSeen(userId) || Date.now() };
-  io.to(`presence:user:${userId}`).emit("presence:update", payload);
-}
+
 
 // küçük yardımcı
 async function deliveredFromBatch({ batch, conversationId, viewerId }) {
@@ -84,6 +52,53 @@ async function deliveredFromBatch({ batch, conversationId, viewerId }) {
   });
 }
 
+async function markUserOnline(userId, socketId) {
+  // Bu kullanıcıya ait socket’leri Redis setinde tut
+  await redis.sadd(`presence:sockets:${userId}`, socketId);
+  await redis.set(`presence:online:${userId}`, "1", "EX", 30); // 30 sn TTL
+  await redis.del(`lastSeen:${userId}`);
+
+  // Broadcast
+  io.to(`presence:user:${userId}`).emit("presence:update", {
+    userId,
+    online: true,
+    lastSeen: null,
+  });
+
+  // TTL yenileme heartbeat (her 10sn bir)
+  const intervalKey = `interval:${socketId}`;
+  if (!global[intervalKey]) {
+    global[intervalKey] = setInterval(async () => {
+      const sockets = await redis.smembers(`presence:sockets:${userId}`);
+      if (sockets.length > 0) {
+        await redis.set(`presence:online:${userId}`, "1", "EX", 30);
+      } else {
+        clearInterval(global[intervalKey]);
+        delete global[intervalKey];
+      }
+    }, 10000);
+  }
+}
+
+async function markUserOffline(userId, socketId) {
+  await redis.srem(`presence:sockets:${userId}`, socketId);
+  const sockets = await redis.smembers(`presence:sockets:${userId}`);
+
+  if (sockets.length === 0) {
+    await redis.del(`presence:online:${userId}`);
+    await redis.set(`lastSeen:${userId}`, Date.now());
+    io.to(`presence:user:${userId}`).emit("presence:update", {
+      userId,
+      online: false,
+      lastSeen: new Date(),
+    });
+  }
+}
+
+async function getLastSeen(userId) {
+  const ts = await redis.get(`lastSeen:${userId}`);
+  return ts ? Number(ts) : null;
+}
 
 
 const io = new Server(server, {
@@ -94,6 +109,8 @@ const io = new Server(server, {
   },
   maxHttpBufferSize: 1e8 // 100 MB
 });
+
+
 io.on("connection", (socket) => {   
   let currentUserId = null;
   
@@ -101,11 +118,11 @@ io.on("connection", (socket) => {
   socket.on("join", async ({userId,last_seen}) => {
   currentUserId = String(userId);
   socket.data.userId = String(userId || "");
-  if (!socketsByUser.has(currentUserId)) socketsByUser.set(currentUserId, new Set());
-  socketsByUser.get(currentUserId).add(socket.id);
+  
+
   socket.join(`user:${currentUserId}`);
+  await markUserOnline(currentUserId, socket.id);
   console.log("kullanıcı odaya katıldı: ",`user:${currentUserId}`,last_seen)
-  emitPresence(currentUserId, true);
 
   try {
 
@@ -371,26 +388,7 @@ io.on("connection", (socket) => {
   });
 
  
-  socket.on("presence:subscribe", ({ userIds = [] } = {}) => {
-    for (const uid of userIds) socket.join(`presence:user:${String(uid)}`);
-  });
-
-  // İstemci “artık izlemiyorum” der
-  socket.on("presence:unsubscribe", ({ userIds = [] } = {}) => {
-    for (const uid of userIds) socket.leave(`presence:user:${String(uid)}`);
-  });
-
-  // İstemci “şu kullanıcıların anlık durumunu” sorar
-  socket.on("presence:who", async ({ userIds = [] } = {}, cb) => {
-    const res = {};
-    for (const uid0 of userIds) {
-      const uid = String(uid0);
-      const online = socketsByUser.get(uid)?.size > 0;
-      res[uid] = { online, lastSeen: online ? undefined : (await getLastSeen(uid) || null) };
-    }
-    cb?.(res);
-  });
-
+  
   socket.on("message:delivered", async ({ messageId, conversationId, userId }) => {
   try {
     console.log("iletildi: ",{ messageId, conversationId, userId })
@@ -665,19 +663,42 @@ io.on("connection", (socket) => {
     }
   });
 
+  // presence:subscribe
+  socket.on("presence:subscribe", ({ userIds = [] } = {}) => {
+    for (const uid of userIds) {
+      socket.join(`presence:user:${String(uid)}`);
+    }
+  });
+
+  // presence:unsubscribe
+  socket.on("presence:unsubscribe", ({ userIds = [] } = {}) => {
+    for (const uid of userIds) {
+      socket.leave(`presence:user:${String(uid)}`);
+    }
+  });
+
+  // presence:who
+  socket.on("presence:who", async ({ userIds = [] } = {}, cb) => {
+    const res = {};
+    for (const uid0 of userIds) {
+      const uid = String(uid0);
+
+      const online = await redis.exists(`presence:online:${uid}`);
+      let lastSeen = null;
+      if (!online) {
+        lastSeen = await redis.get(`lastSeen:${uid}`);
+        if (lastSeen) lastSeen = new Date(Number(lastSeen));
+      }
+      res[uid] = { online: !!online, lastSeen };
+    }
+    cb?.(res);
+  });
 
 
 
   socket.on("disconnect",async () => {
     if (!currentUserId) return;
-    const set = socketsByUser.get(currentUserId);
-    if (!set) return;
-    set.delete(socket.id);
-    if (set.size === 0) {
-      socketsByUser.delete(currentUserId);
-      await setLastSeen(currentUserId, Date.now());
-      emitPresence(currentUserId, false);
-    }
+    await markUserOffline(currentUserId, socket.id);
   });
 });
 
