@@ -35,7 +35,7 @@ html{
 }
 
 body{
-    background-color: variables.$settings-backend;
+    background-color: variables.$dark-bg;
     font-family: "Segoe UI", Helvetica, sans-serif;
     line-height: 1.5;
     font-size: 1.6rem;
@@ -193,4 +193,90 @@ img{
 }
 .lazy-image.full.loaded {
   opacity: 1;
+}
+
+ .dark-dropdown .country { color: #eaeaea; }
+  .dark-dropdown .country .dial-code { color: #bdbdbd; }
+  .dark-dropdown .country:hover,
+  .dark-dropdown .country.highlight {
+    background: #1e1e1e !important;
+    color: #fff !important;
+  }
+
+  .lazy-image-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    pointer-events: none;
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid #ffcc00;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+  }
+
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+
+  .chat__loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  // arka planı biraz geçirgen yapıp mesajlar gözüksün:
+  background: rgba(0,0,0,0.18);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+
+  // overlay scroll’u engellesin:
+  pointer-events: auto;
+
+  .chat__loading-text {
+    margin-top: .6rem;
+    font-size: 14px;
+    color: #fff;
+    opacity: .9;
+  }
+}
+
+.chat__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.emoji-picker, .emoji-popup {
+  font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif !important;
+}
+.emoji-popup {
+  position: absolute!important;
+  bottom: 60px!important;
+  left: 20px!important;
+  z-index: 1000!important;
+  background: #1e1e1e!important;
+  border: 1px solid #333!important;
+  border-radius: 8px!important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
 }

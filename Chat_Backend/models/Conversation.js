@@ -30,6 +30,7 @@ const ConversationSchema = new mongoose.Schema({
     sent_at: Date,
     status: { type: String, enum: ["sent", "delivered", "read"], default: "sent" },
   },
+  active_call: { type: mongoose.Schema.Types.ObjectId, ref: "Call", default: null },
   unread: { type:Number, default:0 },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });

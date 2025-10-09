@@ -5,7 +5,47 @@
 .container{
     // max-width: variables.$max-width;
     margin:auto;
-    padding: 0
+    padding: 0;
+    display: grid;
+    
+    color: white;
+    text-shadow: 0 1px 0 #000;
+  
+    --border-angle: 0turn; // For animation.
+    --main-bg: conic-gradient(
+        from var(--border-angle),
+        #213,
+        #112 25%,
+        #112 50%,
+        #213 75%,
+        #213 100%
+      );
+  
+    border: solid 1px transparent;
+   --gradient-border: conic-gradient(from var(--border-angle), transparent 25%, rgb(44, 44, 44), rgb(109, 109, 109) 99%, transparent);
+  
+    background: 
+      // padding-box clip this background in to the overall element except the border.
+      var(--main-bg) padding-box,
+      // border-box extends this background to the border space
+      var(--gradient-border) border-box, 
+      // Duplicate main background to fill in behind the gradient border. You can remove this if you want the border to   extend "outside" the box background.
+      var(--main-bg) border-box;
+
+    background-position: center center;
+
+    animation: bg-spin 5s linear infinite;
+    @keyframes bg-spin {
+      to {
+        --border-angle: 1turn;
+      }
+    }
+
+  }
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0turn;
 }
 
 //buttons
@@ -121,6 +161,12 @@ input[class^='btn-']:hover
     }
 }
 
+.mb{
+  &-06{
+    margin-bottom: .6rem!important;
+  }
+}
+
 .mx{
     &-1{
         margin: 0 1rem;
@@ -140,6 +186,7 @@ input[class^='btn-']:hover
 }
 
 .m{
+  
     &-1{
         margin: 1rem;
     }
@@ -385,7 +432,7 @@ input[class^='btn-']:hover
     flex: 1;
     display: grid;
     place-items: center;
-    padding: 12px;
+    padding: 1.2rem;
     overflow: hidden;
     img, video, iframe {
       max-width: 92vw;
@@ -427,16 +474,26 @@ input[class^='btn-']:hover
     border-radius: 50%;
     border: 0;
     color: #fff;
-    font-size: 26px;
+    font-size: 2.6rem;
     background: rgba(0,0,0,.35);
     cursor: pointer;
     transition: background .15s ease;
     z-index: 2;
 
-    &--prev { left: 12px; }
-    &--next { right: 12px; }
+    &--prev { 
+      display: flex;
+      left: 1.3rem;
+      align-items: center;
+      justify-content: center;
+    }
+    &--next { 
+      display: flex;
+      right: 1.3rem;
+      align-items: center;
+      justify-content: center;
+    }
 
-    &:hover { background: rgba(0,0,0,.5); }
+    &:hover { background-color: #161616}
     &:focus-visible { outline: 2px solid #00d4aa; outline-offset: 2px; }
   }
 

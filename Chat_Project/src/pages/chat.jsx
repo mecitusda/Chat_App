@@ -8,7 +8,10 @@ import ChatPanel from "../components/ChatPanel";
 import { useSocket } from "../hooks/useSocket";
 import { useDispatch, useSelector } from "react-redux";
 import { selectAtBottom } from "../slices/uiSlice";
-import { updateConversationAvatars } from "../slices/conversationSlice";
+import {
+  updateConversationAvatars,
+  updateConversationCall,
+} from "../slices/conversationSlice";
 // Conversations
 import {
   addOrUpdateConversations,
@@ -22,12 +25,15 @@ import { addOrUpdateMessages, applyMessageAck } from "../slices/messageSlice";
 import { upsertFiles } from "../slices/fileSlice";
 
 import { setHasMore, setOldestMessageId } from "../slices/paginationSlice";
-import { useOutletContext } from "react-router";
+import { Navigate, replace, useNavigate, useOutletContext } from "react-router";
 
 import SettingsPanel from "../components/SettingPanel";
 import FriendRequests from "../components/FriendRequests";
 import { useFriends } from "../hooks/useFriends";
 import { useUser } from "../contextAPI/UserContext";
+import IncomingCallModal from "../components/IncomingCallModal";
+import OutgoingCallModal from "../components/OutgoingCallModal";
+import { setParticipants, userJoined, userLeft } from "../slices/callSlice";
 
 const playNotificationSound = () => {
   const audio = new Audio("/sounds/new-notification.mp3");
@@ -56,7 +62,8 @@ const Chat = () => {
 
   const dispatch = useDispatch();
   // Global state
-
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [outgoingCall, setOutgoingCall] = useState(null);
   const conversations = useSelector((s) => s.conversations.list || []);
   const messagesByConv = useSelector((s) => s.messages?.byConversation || {});
   const filesByConv = useSelector((s) => s.files?.byKey || {});
@@ -72,7 +79,7 @@ const Chat = () => {
 
   // UI state
   const [activePage, setActivePage] = useState("chatList");
-
+  const navigate = useNavigate();
   // Yeni mesaj (after) fetch animasyonu için
   const [fetchingNew, setFetchingNew] = useState(false);
   // Socket
@@ -94,7 +101,6 @@ const Chat = () => {
     );
     if (fresh) setActiveConversation(fresh);
   }, [activeConversationId, conversations]);
-
   // Aynı lastId için üst üste messages-after emit etmemek için guard
   const lastAfterSentRef = useRef({}); // { [convId]: lastAfterId }
 
@@ -146,7 +152,6 @@ const Chat = () => {
       const arr = newData?.messages || [];
       const page = newData?.pageInfo || {};
       setFetchingNew(false);
-      console.log("newData: ", newData);
       const convId =
         newData.conversationId ||
         arr[0]?.conversation ||
@@ -264,26 +269,6 @@ const Chat = () => {
         }
       }
     };
-
-    // const handleBgPreUrls = (data) => {
-    //   if (!data || typeof data !== "object" || !user?._id) return;
-    //   const userItems = data; // sadece kendin için kontrol et
-
-    //   const NOW = Date.now();
-    //   const ONE_HOUR = 60 * 60 * 1000;
-    //   const SAFETY_BUFFER = 5 * 60 * 1000;
-    //   const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
-
-    //   setUser((prev) => ({
-    //     ...prev,
-    //     settings: {
-    //       ...prev.settings,
-    //       chatBgImageUrl: data[0].media_url,
-    //       expiresAt: DEFAULT_EXPIRES_AT,
-    //     },
-    //   }));
-    // };
-
     // 🔧 DÜZELTİLEN KISIM
 
     const handleStatusUpdate = ({
@@ -395,7 +380,7 @@ const Chat = () => {
       if (
         isFromOther &&
         (!isActiveConv || !panelAtBottom || !isTabVisible) &&
-        r.data.last_message.message._id !== undefined
+        r.data.last_message?.message?._id !== undefined
       ) {
         const increment = r.data?.last_message?.sender._id !== userId ? 1 : 0;
         if (increment === 1) {
@@ -437,6 +422,101 @@ const Chat = () => {
     };
   }, [socket, activeConversation?._id, dispatch, userId, activeAtBottom]);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    // 📥 Biri arama başlattı → modal aç
+    socket.on(
+      "call:incoming",
+      ({ callId, conversationId, from, type, callType }) => {
+        setIncomingCall({
+          callId,
+          conversationId,
+          from,
+          type, // "group" | "private"
+          callType, // "video" | "audio"
+        });
+      }
+    );
+
+    socket.on("call:accepted", ({ callId, by }) => {
+      if (outgoingCall && outgoingCall.callId === callId) {
+        console.log("karşı taraf kabul etti.", { callId, by });
+        socket.emit(
+          "call:create-or-join",
+          {
+            conversationId: outgoingCall.conversationId, // bunu setOutgoingCall içinde saklamalısın
+            userId: user._id,
+            callType: "video",
+            conversationType: "private",
+            peers: [outgoingCall.peerId, user._id],
+          },
+          (res) => {
+            console.log("giriş yapılıyor.", res);
+            if (res.success && res.callId) {
+              navigate(`/call/${res.callId}`, {
+                state: { callerId: user._id },
+              });
+              setOutgoingCall(null);
+            }
+          }
+        );
+      }
+    });
+
+    socket.on("call:rejected", ({ callId, by }) => {
+      if (outgoingCall && outgoingCall.callId === callId) {
+        showNotification(`📴 Kullanıcı ${by} aramayı reddetti.`);
+        setOutgoingCall(null);
+      }
+    });
+
+    socket.on("call:participants", ({ callId, participants }) => {
+      console.log("📡 call:participants", callId, participants);
+      dispatch(setParticipants({ callId, participants }));
+    });
+
+    // 🔹 2) Bir kullanıcı odaya katıldı (call içindekilere)
+    socket.on("call:user-joined", ({ userId, callId }) => {
+      console.log("📡 call:user-joined", userId);
+      dispatch(userJoined({ callId, userId }));
+    });
+
+    // 🔹 3) Bir kullanıcı odadan ayrıldı (call içindekilere)
+    socket.on("call:user-left", ({ userId, callId }) => {
+      console.log("📡 call:user-left", userId);
+      dispatch(userLeft({ callId, userId }));
+    });
+
+    socket.on(
+      "call:update",
+      ({ action, triggerUserId, conversationId, active_call }) => {
+        console.log("📞 call:update geldi", {
+          action,
+          conversationId,
+          active_call,
+        });
+        dispatch(
+          updateConversationCall({
+            conversationId,
+            active_call,
+            action,
+            triggerUserId,
+          })
+        );
+      }
+    );
+
+    return () => {
+      socket.off("call:incoming");
+      socket.off("call:accepted");
+      socket.off("call:rejected");
+      socket.off("call:participants");
+      socket.off("call:user-joined");
+      socket.off("call:user-left");
+    };
+  }, [socket, outgoingCall, user, navigate]);
+
   // ————————————————— UI —————————————————
   const handleOption1Click = () => setActivePage("chatList");
   const handleFriendRequests = () => setActivePage("friendRequests");
@@ -449,7 +529,6 @@ const Chat = () => {
   return (
     <>
       <title>Chat</title>
-
       <div className="chat-container container">
         {/* Chat Options */}
         <div
@@ -541,6 +620,7 @@ const Chat = () => {
             activeConversation={activeConversation}
           />
         )}
+
         {activePage === "friendRequests" && (
           <FriendRequests socket={socket} showNotification={showNotification} />
         )}
@@ -565,22 +645,65 @@ const Chat = () => {
             isOnline={isConnected}
             setActiveConversation={setActiveConversation}
             setactiveConversationId={setactiveConversationId}
+            setOutgoingCall={setOutgoingCall}
+            showNotification={showNotification}
           />
         ) : (
           <SettingsPanel activePage={activePage} />
         )}
+        <IncomingCallModal
+          incomingCall={incomingCall}
+          onAccept={() => {
+            socket.emit(
+              "call:create-or-join",
+              {
+                conversationId: incomingCall.conversationId,
+                userId: user._id,
+                callType: incomingCall.callType,
+                conversationType: incomingCall.type, // "private"
+                peers: [incomingCall.from, user._id],
+              },
+              (res) => {
+                if (res.success && res.callId) {
+                  // ✅ Caller’a “accepted” bildir
+                  socket.emit("call:accept", {
+                    callId: res.callId,
+                    userId: user._id,
+                    callerId: incomingCall.from,
+                  });
+
+                  setIncomingCall(null);
+                  navigate(`/call/${res.callId}`, {
+                    state: { callerId: incomingCall.from },
+                  });
+                } else {
+                  alert("Aramaya katılım başarısız oldu");
+                }
+              }
+            );
+          }}
+          onReject={() => {
+            if (incomingCall.type === "private") {
+              socket.emit("call:reject", {
+                callId: incomingCall.callId,
+                userId: user._id,
+                callerId: incomingCall.from, // backend'e callerId gönder
+              });
+            }
+            setIncomingCall(null);
+          }}
+        />
+        <OutgoingCallModal
+          call={outgoingCall} // { callId, peerId, peerName?, callType }
+          onCancel={() => {
+            socket.emit("leave-call", {
+              userId: user._id,
+              callId: outgoingCall.callId,
+            });
+            setOutgoingCall(null);
+          }}
+        />
       </div>
-      <button
-        className="reset"
-        onClick={() => {
-          setResetEnabled(true);
-          handleClick();
-          showNotification("Veriler silindi.");
-        }}
-        disabled={!resetEnabled}
-      >
-        {resetEnabled ? "DO NOT PRESS" : "YETER DAHA BASMA SAYFA YENİLE"}
-      </button>
     </>
   );
 };

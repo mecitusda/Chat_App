@@ -9,10 +9,11 @@ import presenceSliceReducer from "../slices/presenceSlice"
 import uiSliceReducer from "../slices/uiSlice"
 import friendSliceReducer from "../slices/friendSlice"
 import notificationReducer from "../slices/notificationSlice"
+import callReducer from "../slices/callSlice"
 const rootPersistConfig = {
   key: "root",
   storage,
-  whitelist: ["files", "messages", "conversations","paginations","presenceSlices","uiSlices","notifications","friends"], // keep small indexes/metadata in LS
+  whitelist: ["files", "messages", "conversations","paginations","presenceSlices","uiSlices","notifications","friends","calls"], // keep small indexes/metadata in LS
 };
 
 const rootReducer = combineReducers({
@@ -23,7 +24,8 @@ const rootReducer = combineReducers({
   presences:presenceSliceReducer,
   ui:uiSliceReducer,
   friends:friendSliceReducer,
-  notifications:notificationReducer
+  notifications:notificationReducer,
+  calls:callReducer
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);

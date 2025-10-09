@@ -18,7 +18,6 @@ export function ProtectedRoute() {
 export function AuthRoute() {
   const { user } = useUser();
   const parentContext = useOutletContext();
-
   if (user) {
     return <Navigate to="/chat" replace />;
   }

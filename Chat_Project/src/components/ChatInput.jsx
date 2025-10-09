@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import PlusMenu from "./PlusMenu";
 
+import { EmojiPicker } from "./EmojiPickerComponent";
 /**
  * props:
  * - socket
@@ -21,6 +22,7 @@ export default function ChatInput({
   userId,
   isOnline,
   onOptimisticMessage,
+  addoutboxRef,
   onAckReplace,
   onAckStatus,
   file,
@@ -33,7 +35,8 @@ export default function ChatInput({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef(null);
-
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerWrapperRef = useRef(null);
   // --- typing mantığı ---
   const typingRef = useRef(false);
   const lastKeyAtRef = useRef(0);
@@ -43,6 +46,26 @@ export default function ChatInput({
 
   const TYPING_IDLE_MS = 1200;
   const TYPING_HEARTBEAT_MS = 3000;
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      // ref varsa ve tıklama alanı onun içindeyse = dış sayma
+      if (
+        pickerWrapperRef.current &&
+        pickerWrapperRef.current.contains(e.target)
+      )
+        return;
+      setShowPicker(false);
+    }
+
+    if (showPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showPicker]);
 
   const startTyping = () => {
     if (!socket || !isOnline || !conversationId || !userId) return;
@@ -132,7 +155,7 @@ export default function ChatInput({
 
   // gönderme
   async function handleSend() {
-    if (!isOnline || !userId) return;
+    if (!userId) return;
     if (!text.trim() && !file) return;
 
     setSending(true);
@@ -170,11 +193,11 @@ export default function ChatInput({
       if (file) {
         media = await presignAndUpload({ file, conversationId: convId });
       }
-      console.log("file: ", media);
       const nowISO = new Date().toISOString();
       const optimistic = {
         _id: tempId,
         conversation: convId,
+        clientId: tempId,
         sender: userId,
         type: media
           ? media.mime.startsWith("image/")
@@ -197,28 +220,33 @@ export default function ChatInput({
       onOptimisticMessage?.(optimistic);
 
       // 📌 servera yolla
-      socket.emit(
-        "send-message",
-        {
-          conversationId: convId,
-          sender: userId,
-          type: optimistic.type,
-          text: optimistic.text,
-          media_key: optimistic.media_key,
-          mimetype: optimistic.mimetype,
-          size: optimistic.size,
-          clientTempId: tempId,
-        },
-        (ack) => {
-          if (!ack || ack.success === false) {
-            onAckStatus?.(convId, tempId, "failed");
+      if (socket?.connected) {
+        console.log("bağlı");
+        socket.emit(
+          "send-message",
+          {
+            conversationId: convId,
+            sender: userId,
+            type: optimistic.type,
+            text: optimistic.text,
+            media_key: optimistic.media_key,
+            mimetype: optimistic.mimetype,
+            size: optimistic.size,
+            clientTempId: tempId,
+          },
+          (ack) => {
+            if (!ack || ack.success === false) {
+              onAckStatus?.(convId, tempId, "failed");
+              setSending(false);
+              return;
+            }
+            onAckReplace?.(tempId, ack.message);
             setSending(false);
-            return;
           }
-          onAckReplace?.(tempId, ack.message);
-          setSending(false);
-        }
-      );
+        );
+      } else {
+        addoutboxRef(optimistic);
+      }
     } catch (err) {
       console.error("send error:", err);
       onAckStatus?.(conversationId, tempId, "failed");
@@ -241,34 +269,61 @@ export default function ChatInput({
   };
 
   return (
-    <div className="chat__input-area">
-      <PlusMenu onSelect={handlePlusSelect} />
+    <>
+      {conversation && (
+        <div className="chat__input-area">
+          <div
+            ref={pickerWrapperRef}
+            style={{ position: "relative", display: "inline-block" }}
+          >
+            <button
+              onClick={() => setShowPicker((prev) => !prev)}
+              className="emoji-btn"
+            >
+              😊
+            </button>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-        accept="image/*,video/*,application/*"
-      />
+            {showPicker && (
+              <div
+                className="emoji-popup"
+                style={{ position: "absolute", bottom: "40px", left: "0" }}
+              >
+                <EmojiPicker
+                  className="h-[326px] rounded-lg border shadow-md"
+                  onSelect={(emoji) => setText((prev) => prev + emoji)}
+                />
+              </div>
+            )}
+          </div>
 
-      <input
-        type="text"
-        placeholder={isOnline ? "Mesaj yaz..." : "Çevrimdışı"}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          if (e.target.value.trim()) notifyTyping();
-          else stopTyping();
-        }}
-        onKeyDown={handleKeyDown}
-        onBlur={stopTyping}
-        disabled={!isOnline}
-      />
+          <PlusMenu onSelect={handlePlusSelect} />
 
-      <button onClick={handleSend} disabled={!isOnline || sending}>
-        {sending ? "Gönderiliyor..." : "Gönder"}
-      </button>
-    </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+            accept="image/*,video/*,application/*"
+          />
+
+          <input
+            type="text"
+            placeholder={isOnline ? "Mesaj yaz..." : "Çevrimdışı"}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (e.target.value.trim()) notifyTyping();
+              else stopTyping();
+            }}
+            onKeyDown={handleKeyDown}
+            onBlur={stopTyping}
+          />
+
+          <button onClick={handleSend} disabled={sending}>
+            {sending ? "Gönderiliyor..." : "Gönder"}
+          </button>
+        </div>
+      )}
+    </>
   );
 }

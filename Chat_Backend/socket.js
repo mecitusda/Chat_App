@@ -82,9 +82,20 @@ async function markUserOnline(userId, socketId) {
 
 async function markUserOffline(userId, socketId) {
   await redis.srem(`presence:sockets:${userId}`, socketId);
-  const sockets = await redis.smembers(`presence:sockets:${userId}`);
 
-  if (sockets.length === 0) {
+  const sockets = await redis.smembers(`presence:sockets:${userId}`);
+  const activeSockets = [];
+  const allSockets = await io.fetchSockets();
+
+  for (const sId of sockets) {
+    if (allSockets.some((s) => s.id === sId)) {
+      activeSockets.push(sId);
+    } else {
+      await redis.srem(`presence:sockets:${userId}`, sId); // çürükleri temizle
+    }
+  }
+
+  if (activeSockets.length === 0) {
     await redis.del(`presence:online:${userId}`);
     await redis.set(`lastSeen:${userId}`, Date.now());
     io.to(`presence:user:${userId}`).emit("presence:update", {
@@ -95,10 +106,14 @@ async function markUserOffline(userId, socketId) {
   }
 }
 
+
 async function getLastSeen(userId) {
   const ts = await redis.get(`lastSeen:${userId}`);
   return ts ? Number(ts) : null;
 }
+
+
+
 
 
 const io = new Server(server, {
@@ -107,7 +122,8 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true,
   },
-  maxHttpBufferSize: 1e8 // 100 MB
+  maxHttpBufferSize: 1e8, // 100 MB,
+   transports: ["websocket"],
 });
 
 
@@ -115,14 +131,14 @@ io.on("connection", (socket) => {
   let currentUserId = null;
   
 
-  socket.on("join", async ({userId,last_seen}) => {
+  socket.on("join-chat", async ({userId,last_seen}) => {
   currentUserId = String(userId);
   socket.data.userId = String(userId || "");
   
 
   socket.join(`user:${currentUserId}`);
   await markUserOnline(currentUserId, socket.id);
-  console.log("kullanıcı odaya katıldı: ",`user:${currentUserId}`,last_seen)
+  console.log("kullanıcı odaya katıldı: ",`user:${currentUserId}`,socket.id)
 
   try {
 
@@ -177,7 +193,35 @@ io.on("connection", (socket) => {
     console.error("join error:", err?.response?.data || err?.message);
     socket.emit("error", "Chat listesi alınamadı");
   }
-});
+  });
+
+
+  socket.on("join-call", async ({ userId, callId }) => {
+    const uid = String(userId);
+    socket.data.userId = uid;
+
+    socket.join(`call:${callId}`);
+    socket.join(`user:${uid}`);
+
+    // ✅ 1. Return current participants (including themselves)
+    const clients = await io.in(`call:${callId}`).fetchSockets();
+    const participants = [...new Set(clients.map((s) => s.data.userId))];
+
+    // send full list to all
+    io.to(`call:${callId}`).emit("call:participants", { callId, participants });
+
+    // and optionally, still send "user-joined" separately if you want quick UI update
+    socket.to(`call:${callId}`).emit("call:user-joined", { callId, userId: uid });
+
+    
+  
+    
+    console.log(`📞 ${uid} joined call:${callId}`);
+  });
+
+
+
+
 
   socket.on("watch-conversation", ({ conversationId }) => {
     if(!conversationId) return;
@@ -229,20 +273,16 @@ io.on("connection", (socket) => {
         size,
         clientTempId,     // UI’daki temp id
       } = payload;
-      // 1) DB’ye yaz (REST API’n)
-      // örnek bir endpoint varsayıyorum:
-      // POST /api/conversation/:id/message
-
-      // console.log({
-      //   conversationId,
-      //   sender,
-      //   type,             // "text" | "media"
-      //   text,
-      //   media_key,        // presign sonrası oluşan key
-      //   mimetype,         // image/png, video/mp4 ...
-      //   size,
-      //   clientTempId,     // UI’daki temp id
-      // })
+      console.log({
+        conversationId,
+        sender,
+        type,             // "text" | "media"
+        text,
+        media_key,        // presign sonrası oluşan key
+        mimetype,         // image/png, video/mp4 ...
+        size,
+        clientTempId,     // UI’daki temp id
+      })
       const { data } = await axios.post(
         `${BACKEND_URL}/api/conversation/message`,
         {
@@ -696,12 +736,171 @@ io.on("connection", (socket) => {
 
 
 
-  socket.on("disconnect",async () => {
-    if (!currentUserId) return;
-    await markUserOffline(currentUserId, socket.id);
-  });
-});
 
-server.listen(PORT, () => {
-  console.log(`Socket server running on port ${PORT}`);
+   socket.on("webrtc:offer", ({ to, from, offer }) => {
+    io.to(`user:${to}`).emit("webrtc:offer", { from, offer });
+  });
+
+  socket.on("webrtc:answer", ({ to, from, answer }) => {
+    io.to(`user:${to}`).emit("webrtc:answer", { from, answer });
+  });
+
+  socket.on("webrtc:candidate", ({ to, from, candidate }) => {
+    io.to(`user:${to}`).emit("webrtc:candidate", { from, candidate });
+  });
+
+  socket.on("webrtc:ready", async ({ userId, callId }) => {
+    const uid = String(userId);
+    socket.data.userId = uid;
+
+    const clients = await io.in(`call:${callId}`).fetchSockets();
+    const participants = [...new Set(clients.map((s) => s.data.userId))];
+
+    // Send the ready signal to all *other* users
+    socket.to(`call:${callId}`).emit("webrtc:peer-ready", {
+      callId,
+      userId: uid,
+    });
+
+    console.log(`✅ ${uid} is ready in call:${callId} (participants: ${participants})`);
+    });
+
+
+
+
+
+
+
+
+  // === 1) Call başlat veya join isteği (API üzerinden DB kaydı) ===
+    socket.on(
+    "call:create-or-join",
+    async ({ conversationId, userId, callType, conversationType, peers }, ack) => {
+      try {
+        const { data } = await axios.post(`${BACKEND_URL}/api/conversation/join`, {
+          conversationId,
+          callerId: userId,
+          callType,
+        });
+        if (!data.success) {
+          ack?.({ success: false, message: data.message });
+          return;
+        }
+
+        const call = data.call;
+        ack?.({ success: true, callId: call._id, call });
+
+        // Gelen çağrıyı diğer peer’lara bildir
+        if (conversationType === "group") {
+          (peers || []).forEach((pid) => {
+            if (String(pid) !== String(userId)) {
+              io.to(`user:${pid}`).emit("call:incoming", {
+                callId: call._id,
+                conversationId,
+                from: userId,
+                type: "group",
+                callType,
+              });
+            }
+          });
+        } else {
+          const peerId = (peers || []).find((p) => String(p) !== String(userId));
+          if (peerId) {
+            io.to(`user:${peerId}`).emit("call:incoming", {
+              callId: call._id,
+              conversationId,
+              from: userId,
+              type: "private",
+              callType,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("call:create-or-join error:", err);
+        ack?.({ success: false, message: "Server error" });
+      }
+    }
+  );
+
+
+    // === 3) Private call kabul etme ===
+  socket.on("call:accept", ({ callId, userId, callerId }) => {
+    socket.join(`call:${callId}`);
+    socket.join(`user:${String(userId)}`);
+
+    io.to(`user:${callerId}`).emit("call:accepted", {
+      callId,
+      by: userId,
+    });
+  });
+
+  socket.on("call:reject", ({ callId, userId, callerId }) => {
+    io.to(`user:${callerId}`).emit("call:rejected", {
+      callId,
+      by: userId,
+    });
+  });
+
+
+   socket.on("leave-call", async ({ userId, callId,conversationId }) => {
+    const uid = String(userId);
+    socket.leave(`call:${callId}`);
+    console.log("kullanıcı çıktı.",{ userId, callId,conversationId })
+    socket.to(`call:${callId}`).emit("call:user-left", { userId: uid });
+  
+    try{
+    await axios.post(`${BACKEND_URL}/api/conversation/leave`, {
+      userId: uid,
+      callId,
+    });
+    const {data} = await axios.get(`${BACKEND_URL}/api/conversation/conversation/${conversationId}`);
+
+    const responsemembers = await axios.get(`${BACKEND_URL}/api/conversation/${conversationId}/members`)
+      for (const m of responsemembers.data?.members) {
+        io.to(`user:${m}`).emit("chatList:update", 
+          {data:data?.conversation,
+          message:"update call count"}
+        );
+      }
+    }catch (err) {
+    console.error("leave error:", err?.response?.data || err?.message);
+    socket.emit("error", "Kullanıcı ayrılamadı");
+  }
+  });
+
+
+  socket.on("disconnect", async () => {
+  const uid = socket.data?.userId;
+  if (!uid) return;
+  console.log(`❌ disconnect: ${uid}${socket.id}`);
+  await markUserOffline(uid,socket.id)
+  //  setTimeout(async () => {
+  //   // check if user has reconnected
+  //   const allSockets = await io.fetchSockets();
+  //   const stillConnected = allSockets.some((s) => s.data.userId === uid);
+  //   if (stillConnected) {
+  //     console.log(`⚙️ ${uid} quickly reconnected — skipping leave.`);
+  //     return;
+  //   }
+      
+  //   const callRooms = [...socket.rooms].filter((r) => r.startsWith("call:"));
+  //   for (const room of callRooms) {
+  //     const callId = room.split(":")[1];
+  //     socket.leave(room);
+  //     io.to(room).emit("call:user-left", { userId: uid });
+  //     const clients = await io.in(room).fetchSockets();
+  //     const participants = [...new Set(clients.map((s) => s.data.userId))];
+  //     io.to(room).emit("call:participants", { callId, participants });
+  //   }
+    
+  // }, 1500); // small delay prevents flicker on refresh
+
 });
+  
+
+  });
+
+
+  server.listen(PORT, () => {
+    console.log(`Socket server running on port ${PORT}`);
+  });

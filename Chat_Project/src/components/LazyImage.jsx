@@ -17,6 +17,13 @@ export default function LazyImage({
         className="lazy-image thumb"
         loading="lazy"
       />
+
+      {!loaded && (
+        <div className="lazy-image-spinner">
+          <div className="spinner" />
+        </div>
+      )}
+
       <img
         src={fullSrc}
         alt={alt}

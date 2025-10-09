@@ -2,6 +2,7 @@ import express from "express";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import User from "../models/Users.js"
+import Call from "../models/Call.js"
 const router = express.Router();
 import mongoose from "mongoose"
 const { Types: { ObjectId } } = mongoose;
@@ -127,6 +128,21 @@ router.get("/messages/:conversationId", async (req, res) => {
   }
 });
 
+router.get("/conversation/:id", async (req,res) => {
+  try{
+    const conv = await Conversation.findById(req.params.id).sort({ updatedAt: -1 })
+      .populate("last_message.sender", "username avatar")
+      .populate("members.user", "username avatar status about")
+      .populate("last_message.message", "")
+      .populate("createdBy","")
+      .populate("active_call","")
+
+    if(!conv) return res.status(404).json({success:false, message:"Chat bulunamadı."})
+    res.json({success:true, conversation:conv})
+  }catch(err){
+    res.status(500).json({success:false,message:err.message})
+  }
+})
 
 
 // Kullanıcının sohbetlerini listeleme
@@ -169,11 +185,12 @@ router.get("/:userId", async (req, res) => {
     let conversations = await Conversation.find({ "members.user": me })
       .sort({ updatedAt: -1 })
       .populate("last_message.sender", "username avatar")
-      .populate("members.user", "username avatar status about")
+      .populate("members.user", "username phone avatar status about")
       .populate("last_message.message", "")
       .populate("createdBy","")
+      .populate("active_call"," ")
       .exec();
-    console.log("conversation: ", conversations)
+   
     // 2) Avatarları güncelle
     for (const conv of conversations) {
       // ✅ Conversation avatar
@@ -223,6 +240,140 @@ router.get("/:userId", async (req, res) => {
   }
 });
 
+router.post("/join", async (req, res) => {
+  try {
+    const { conversationId, callerId, callType } = req.body;
+
+    // 1️⃣ Konuşmayı bul
+    const conv = await Conversation.findById(conversationId);
+    if (!conv) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Conversation not found" });
+    }
+
+    // 2️⃣ Eğer aktif call varsa → katılımcı güncelle veya ekle
+    if (conv.active_call) {
+      const activeCall = await Call.findById(conv.active_call);
+      if (activeCall && !activeCall.ended_at) {
+        const participantIndex = activeCall.participants.findIndex(
+          (p) => String(p.user) === String(callerId)
+        );
+
+        if (participantIndex >= 0) {
+          // 🔁 Kullanıcı daha önce katılmış ama çıkmış → left_at sıfırla
+          activeCall.participants[participantIndex].left_at = null;
+          activeCall.participants[participantIndex].joined_at = new Date();
+        } else {
+          // ➕ Yeni kullanıcıyı ekle
+          activeCall.participants.push({
+            user: callerId,
+            direction: "incoming",
+            joined_at: new Date(),
+          });
+        }
+
+        await activeCall.save();
+        return res.json({ success: true, call: activeCall });
+      }
+    }
+
+    // 3️⃣ Yeni call oluştur (aktif call yoksa)
+    const newCall = await Call.create({
+      conversation_id: conversationId,
+      caller_id: callerId,
+      participants: [
+        {
+          user: callerId,
+          direction: "outgoing",
+          joined_at: new Date(),
+        },
+      ],
+      call_type: callType || "video",
+      status: "ongoing",
+    });
+
+    // 4️⃣ Conversation’a bağla
+    conv.active_call = newCall._id;
+    await conv.save();
+
+    return res.json({ success: true, call: newCall });
+  } catch (err) {
+    console.error("joinCall error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error: " + err.message });
+  }
+});
+
+
+
+
+// routes/callRoutes.js
+router.post("/leave", async (req, res) => {
+  try {
+    const { callId, userId } = req.body;
+    console.log("leave: ", { callId, userId });
+
+    const call = await Call.findById(callId);
+    if (!call) {
+      return res.status(404).json({ success: false, message: "Call not found" });
+    }
+
+    // 1️⃣ Katılımcının left_at alanını güncelle
+    const participant = call.participants.find(
+      (p) => String(p.user) === String(userId)
+    );
+
+    if (participant) {
+      // yalnızca zaten aktifse (left_at boşsa) güncelle
+      if (!participant.left_at) {
+        participant.left_at = new Date();
+      }
+    } else {
+      // 🔸 varsa ama kaydı yoksa (örneğin sistem hatası) ekle
+      call.participants.push({
+        user: userId,
+        direction: "incoming",
+        joined_at: new Date(),
+        left_at: new Date(),
+      });
+    }
+
+    await call.save();
+
+    // 2️⃣ Aktif (henüz left_at olmayan) kullanıcı var mı?
+    const activeUsers = call.participants.filter((p) => !p.left_at);
+
+    if (activeUsers.length === 0) {
+      // Son kişi çıktı → call’u kapat
+      call.ended_at = new Date();
+      call.duration = Math.max(
+        0,
+        Math.round((call.ended_at - call.started_at) / 1000)
+      );
+
+      // Sadece arayan varsa → missed, değilse ended
+      const joinedUsers = call.participants.filter(
+        (p) => String(p.user) !== String(call.caller_id)
+      );
+      call.status = joinedUsers.length === 0 ? "missed" : "ended";
+
+      await call.save();
+
+      // 3️⃣ Conversation'dan aktif call'u kaldır
+      await Conversation.updateOne(
+        { active_call: callId },
+        { $set: { active_call: null } }
+      );
+    }
+
+    return res.json({ success: true, call });
+  } catch (err) {
+    console.error("leaveCall error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 
 
@@ -344,7 +495,7 @@ router.post("/message", async (req, res) => {
     const message = await Message.create({
       conversation, sender, type, text,
       media_key, mimetype, size, media_duration,
-      call_info,
+      call_info,readBy:[{user:sender}],deliveredTo:[{user:sender}]
     });
 
     if(message.media_key){
@@ -363,9 +514,9 @@ router.post("/message", async (req, res) => {
       },
       { new: true }
     ).sort({ updated_at: -1 }).populate({ path: "last_message.sender", select: "username" })
-      .populate("members.user", "username avatar status about")
-      .populate("last_message.message","");
-
+      .populate("members.user", "username phone avatar status about")
+      .populate("last_message.message","")
+      .populate("createdBy", "username");
       
     
     
@@ -610,7 +761,6 @@ router.patch("/message/status", async (req, res) => {
 router.patch('/user/last_seen/:id', async (req,res) => {
   const {id} = req.params;
   try{
-    console.log("girdi")
     const setLast_Seen = await User.findByIdAndUpdate({_id:id},{$set:{last_seen:Date.now()}})
     res.json({success:true,last_seen:setLast_Seen.last_seen})
   }catch(err){

@@ -13,6 +13,7 @@ import Login from "./pages/Login.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import { ProtectedRoute, AuthRoute } from "./routes/AppRouter.jsx";
 import Home from "./pages/Home.jsx";
+import CallPage from "./pages/CallPage.jsx";
 
 const routes = createBrowserRouter([
   // 1️⃣ Ana sayfa
@@ -26,16 +27,19 @@ const routes = createBrowserRouter([
     element: <MainLayout />, // ortak layout
     children: [
       {
+        element: <ProtectedRoute />,
+        children: [
+          { path: "chat", element: <Chat /> },
+          { path: "call/:callId", element: <CallPage /> },
+        ],
+      },
+      {
         element: <AuthRoute />,
         children: [
           { path: "login", element: <Login /> },
           { path: "register", element: <Register /> },
           { path: "verify-email", element: <VerifyEmail /> },
         ],
-      },
-      {
-        element: <ProtectedRoute />,
-        children: [{ path: "chat", element: <Chat /> }],
       },
     ],
   },

@@ -1,7 +1,43 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSelector } from "react-redux";
 import { selectPresence } from "../slices/presenceSlice";
 import { FiArrowLeft } from "react-icons/fi"; // Feather
+import { useNavigate } from "react-router";
+import { MdCall, MdClose } from "react-icons/md";
+import { FiVideo } from "react-icons/fi";
+import { FcVideoCall } from "react-icons/fc";
+import { FaSearch, FaChevronUp, FaChevronDown } from "react-icons/fa";
+import Avatar from "@mui/material/Avatar";
+//call onclick
+// onClick={() => {
+//   // Eğer aktif görüşme yoksa → başlat
+//   if (!activeConversation.active_call) {
+//     handleStartCall();
+//     return;
+//   }
+
+//   // Eğer zaten görüşme varsa → odaya katıl
+//   socket.emit(
+//     "call:create-or-join",
+//     {
+//       conversationId: activeConversation._id,
+//       userId: user._id,
+//       callType: "video",
+//       conversationType: activeConversation.type,
+//       peers: activeConversation.members.map((m) => m.user?._id),
+//     },
+//     (res) => {
+//       if (res.success && res.callId) {
+//         navigate(`/call/${res.callId}`, {
+//           state: { callerId: user._id },
+//         });
+//       } else {
+//         showNotification("Çağrıya katılım başarısız oldu");
+//       }
+//     }
+//   );
+// }}
 
 function formatLastSeen(ts) {
   if (!ts) return "Çevrimdışı";
@@ -25,6 +61,19 @@ function formatLastSeen(ts) {
   })}`;
 }
 
+function getActiveParticipantsCount(conversation) {
+  if (
+    !conversation?.active_call ||
+    !Array.isArray(conversation.active_call.participants)
+  )
+    return 0;
+
+  // joined_at dolu ama left_at olmayanları say
+  return conversation.active_call.participants.filter(
+    (p) => p.joined_at && !p.left_at
+  ).length;
+}
+
 const ChatPanel_Header = ({
   activeConversation,
   userId,
@@ -33,7 +82,44 @@ const ChatPanel_Header = ({
   onOpenProfile,
   setActiveConversation,
   setactiveConversationId,
+  socket,
+  user,
+  setOutgoingCall,
+  showNotification,
+  onSearch,
+  searchQuery,
+  searchIndex,
+  searchCount,
+  onSearchNext,
+  onSearchPrev,
+  setSearchQuery,
 }) => {
+  const navigate = useNavigate();
+  const participants = useSelector(
+    (s) => s.calls.byCallId[activeConversation?.active_call] || []
+  );
+  const [isSearching, setIsSearching] = useState(searchQuery);
+  const inputRef = useRef(null);
+
+  const handleIconClick = () => {
+    console.log("nullandı.");
+    setSearchQuery(null);
+    setIsSearching(false);
+  };
+
+  useEffect(() => {
+    if (isSearching) {
+      inputRef.current?.focus();
+    }
+  }, [isSearching]);
+
+  useEffect(() => {
+    setIsSearching(false);
+  }, [activeConversation._id]);
+
+  const onChange = (e) => {
+    onSearch?.(e.target.value);
+  };
   // --- PRIVATE: karşı tarafın id'si
   const peerId =
     activeConversation?.type === "private"
@@ -59,7 +145,6 @@ const ChatPanel_Header = ({
       .map((m) => m.user?.username || "Bilinmeyen");
   }, [activeConversation, userId, presencesByUser]);
 
-  //console.log(groupOnlineNames);
   // Status metni:
   const statusText =
     activeConversation?.type === "private"
@@ -76,6 +161,43 @@ const ChatPanel_Header = ({
         : `${groupOnlineNames.join(", ")} çevrimiçi`
       : "Şu an kimse çevrimiçi değil";
 
+  const handleStartCall = () => {
+    if (!socket || !user) return;
+    const peerIds = (activeConversation?.members || [])
+      .map((m) => m.user?._id)
+      .filter(Boolean);
+
+    socket.emit(
+      "call:create-or-join",
+      {
+        conversationId: activeConversation._id,
+        userId: user._id,
+        callType: "video",
+        conversationType: activeConversation.type, // "private" | "group"
+        peers: peerIds,
+      },
+      (res) => {
+        if (!res.success) {
+          showNotification("Call başlatılamadı: " + res.message);
+          return;
+        }
+
+        const callId = res.callId;
+
+        if (activeConversation.type === "group") {
+          // ✅ Grup → direkt odaya gir
+          navigate(`/call/${res.callId}`, { state: { callerId: user._id } });
+        } else {
+          // ✅ Private → bekleme ekranına al
+          setOutgoingCall({
+            callId,
+            peerId: peerIds.find((id) => id !== user._id),
+            conversationId: activeConversation._id,
+          });
+        }
+      }
+    );
+  };
   return (
     <div className="chat__header">
       <button
@@ -88,12 +210,11 @@ const ChatPanel_Header = ({
         {" "}
         <FiArrowLeft />
       </button>
-      <img
+      <Avatar
+        alt="Remy Sharp"
         src={avatar}
-        alt={name}
         className="chat__header-avatar"
         onClick={onOpenProfile}
-        style={{ cursor: "pointer" }}
       />
       <div
         className="chat__header-info"
@@ -106,12 +227,95 @@ const ChatPanel_Header = ({
         <span className="chat__header-name">{name}</span>
         <span className="chat__header-status">{statusText}</span>
       </div>
-      <div className="chat__header-options">
-        <div className="disabled-tip">
-          <button className="chat__header-option fa-solid fa-ellipsis-vertical"></button>
+
+      <div className={"chat__header-options"}>
+        <div
+          className={`chat-header__search  ${
+            isSearching ? "active" : "closed"
+          }`}
+        >
+          <input
+            type="text"
+            ref={inputRef}
+            className={`search-input ${isSearching ? "visible" : ""}`}
+            value={searchQuery}
+            onChange={onChange}
+            placeholder="Mesajlarda ara..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (searchCount > 0) {
+                  onSearchNext();
+                }
+              }
+            }}
+          />
+          <div className="divider"></div>
+          <div className="chat-header__search-nav">
+            <button
+              className={"up"}
+              onClick={onSearchPrev}
+              disabled={searchCount === 0}
+            >
+              <FaChevronUp />
+            </button>
+            <button
+              className={"down"}
+              onClick={onSearchNext}
+              disabled={searchCount === 0}
+            >
+              <FaChevronDown />
+            </button>
+            <span>
+              {searchCount > 0
+                ? `${searchIndex + 1} / ${searchCount}`
+                : "0 / 0"}
+            </span>
+            <button
+              onClick={handleIconClick}
+              aria-label="Kapat"
+              className={`search-toggle ${isSearching ? "expanded" : ""}`}
+            >
+              <MdClose color="#fff" />
+            </button>
+          </div>
         </div>
-        <div className="disabled-tip">
-          <button className="chat__header-option fa-solid fa-magnifying-glass"></button>
+        <button
+          className={`chat__header-option ${
+            !isSearching ? "active" : "closed"
+          }`}
+        >
+          <FaSearch
+            className="search-button"
+            onClick={() => {
+              setIsSearching(true);
+            }}
+          />
+        </button>
+
+        <div className="disabled-tip" data-tip="Geliştirme aşamasında">
+          <button
+            className={`chat__header-option ${
+              activeConversation.active_call?.participants.length > 0
+                ? "active-call-btn"
+                : "call-btn"
+            }`}
+            title={
+              activeConversation.active_call
+                ? "Devam eden aramaya katıl"
+                : "Yeni arama başlat"
+            }
+          >
+            {activeConversation.active_call?.participants.length ? (
+              <>
+                <FiVideo size={24} />
+                <span className="call-badge">
+                  {getActiveParticipantsCount(activeConversation)}
+                </span>
+              </>
+            ) : (
+              <MdCall size={24} color="#8696a0" />
+            )}
+          </button>
         </div>
       </div>
     </div>

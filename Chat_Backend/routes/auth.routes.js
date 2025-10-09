@@ -3,6 +3,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/Users.js";
+import Call from "../models/Call.js"
 import dotenv from "dotenv";
 import crypto from "crypto";
 dotenv.config();
@@ -396,6 +397,22 @@ router.get("/:id/friends", async (req, res) => {
     res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 }); 
+
+router.get("/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const calls = await Call.find({ participants: userId })
+      .populate("caller_id", "username avatar")
+      .populate("participants", "username avatar")
+      .sort({ started_at: -1 });
+
+    return res.json({ success: true, calls });
+  } catch (err) {
+    console.error("getUserCalls error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+})
 
 router.get("/:userId", async (req, res) => {
   try {

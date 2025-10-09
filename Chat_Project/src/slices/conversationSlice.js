@@ -197,6 +197,7 @@
         const convId = update._id;
         const idx = state.list.findIndex(c => String(c._id) === String(convId));
       if (idx >= 0 && current(state).list[idx] !== update) {
+        console.log(update)
         if(!update.unread){
         update.unread = current(state).list[idx].unread ?? 0;
         }
@@ -211,6 +212,14 @@
       state.list = sortConversations(state.list); 
       });
       
+      },
+      updateConversationCall(state, action) {
+        const { conversationId, callId, participants } = action.payload;
+        const conv = state.list.find((c) => c._id === conversationId);
+        console.log("güncellenen participants",participants)
+        if (conv) {
+          conv.active_call = {_id: callId,participants:participants};
+        }
       },
 
       // Sadece belirli alanları patch'le (isim, avatar vs.)
@@ -308,7 +317,9 @@
     removeConversation,
     resetConversation,
     updatedLastReadId,
-    updateConversationAvatars
+    updateConversationAvatars,
+    updateConversationCall
+    
   } = conversationsSlice.actions;
 
   export default conversationsSlice.reducer;

@@ -25,7 +25,6 @@ const MainLayout = () => {
 
   const handleClick = () => {
     if (resetEnabled) {
-      console.log("girdi");
       dispatch(resetConversation());
       dispatch(resetMessages());
       dispatch(resetFile());
@@ -44,7 +43,6 @@ const MainLayout = () => {
           setActiveConversation={setActiveConversation}
           setactiveConversationId={setactiveConversationId}
         />
-
         {/* Banner mesajı */}
         {banner.message && (
           <NotificationBanner key={banner.ts} show={banner.message} />

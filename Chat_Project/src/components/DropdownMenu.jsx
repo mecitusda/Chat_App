@@ -10,18 +10,16 @@ import { resetFriends } from "../slices/friendSlice.js";
 import { resetAllPagination } from "../slices/paginationSlice.js";
 import { resetConversation } from "../slices/conversationSlice.js";
 import { useDispatch } from "react-redux";
+import { HiOutlineLogout, HiOutlineDotsVertical } from "react-icons/hi";
+import { MdGroupAdd } from "react-icons/md";
+
 export default function DropdownMenu({ socket, showNotification }) {
   const [open, setOpen] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false); // 👈 modal state
   const ref = useRef(null);
   const navigate = useNavigate();
   const { clearUser } = useUser();
-  const {
-    handleClick,
-    setResetEnabled,
-    setActiveConversation,
-    setactiveConversationId,
-  } = useOutletContext();
+  const { setActiveConversation, setactiveConversationId } = useOutletContext();
 
   const toggleMenu = () => setOpen(!open);
   const dispatch = useDispatch();
@@ -62,14 +60,16 @@ export default function DropdownMenu({ socket, showNotification }) {
   return (
     <div className="dropdown" ref={ref}>
       <button onClick={toggleMenu} className="dropdown-trigger">
-        ⋮
+        <HiOutlineDotsVertical />
       </button>
       {open && (
         <div className="dropdown-menu">
           <button onClick={() => setShowGroupModal(true)}>
-            ➕ Grup Oluştur
+            <MdGroupAdd className="icon" /> Grup Oluştur
           </button>
-          <button onClick={handleLogout}>🚪 Çıkış Yap</button>
+          <button onClick={handleLogout}>
+            <HiOutlineLogout className="icon" /> Çıkış Yap
+          </button>
         </div>
       )}
 

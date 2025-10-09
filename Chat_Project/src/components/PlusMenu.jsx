@@ -43,15 +43,6 @@ const PlusMenu = ({ onSelect }) => {
           <div className="plus-item" onClick={() => handleSelect("contact")}>
             👤 Kişi
           </div>
-          <div className="plus-item" onClick={() => handleSelect("poll")}>
-            📊 Anket
-          </div>
-          <div className="plus-item" onClick={() => handleSelect("sticker")}>
-            ✨ Yeni Çıkartma
-          </div>
-          <div className="plus-item" onClick={() => handleSelect("event")}>
-            📅 Etkinlik
-          </div>
         </div>
       )}
     </div>

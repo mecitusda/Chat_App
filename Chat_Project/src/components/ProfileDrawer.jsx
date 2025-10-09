@@ -2,8 +2,9 @@ import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { addOrUpdateConversations } from "../slices/conversationSlice";
 import axios from "axios";
+import { useEffect } from "react";
+import Avatar from "@mui/material/Avatar";
 export default function ProfileDrawer({
-  isOpen,
   onClose,
   conversation,
   meId,
@@ -16,6 +17,7 @@ export default function ProfileDrawer({
   avatar,
   socket,
 }) {
+  const [animateState, setAnimateState] = useState("closed");
   const isGroup = conversation?.type === "group";
   const dispatch = useDispatch();
   const isAdmin = useMemo(() => {
@@ -24,6 +26,7 @@ export default function ProfileDrawer({
 
   const [view, setView] = useState("info"); // "info" | "media"
   const [newName, setNewName] = useState(conversation?.name || "");
+
   const [uploading, setUploading] = useState(false); // ✅ spinner state
 
   const peer = useMemo(() => {
@@ -95,6 +98,17 @@ export default function ProfileDrawer({
     }
   };
 
+  useEffect(() => {
+    const t = setTimeout(() => setAnimateState("opening"), 10);
+    return () => clearTimeout(t);
+  }, []);
+  const handleClose = () => {
+    setAnimateState("closing"); // önce kayarak kapat
+    setTimeout(() => {
+      onClose(); // animasyon bitince tamamen kapat
+    }, 350); // CSS’teki transition süresiyle eşit olmalı
+  };
+
   // ✅ Grup adı güncelleme handler
   const handleNameChange = async () => {
     if (!newName || newName === conversation?.name) return;
@@ -116,18 +130,22 @@ export default function ProfileDrawer({
   };
   return (
     <div
-      className={`profile-drawer ${isOpen ? "is-open" : ""} ${
-        view === "media" ? "is-media" : ""
-      }`}
+      className={`profile-drawer  ${
+        animateState === "opening"
+          ? "is-open"
+          : animateState === "closing"
+          ? "is-closing"
+          : ""
+      } ${view === "media" ? "is-media" : ""}`}
     >
-      <div className="profile-drawer__overlay" onClick={onClose} />
+      <div className="profile-drawer__overlay" onClick={handleClose} />
 
       <aside className="profile-drawer__panel" role="dialog" aria-modal="true">
         {/* Header */}
         <div className="profile-drawer__header">
           <button
             className="profile-drawer__close fa-solid fa-xmark"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Kapat"
           />
           <div className="profile-drawer__title">Profil</div>
@@ -246,6 +264,62 @@ export default function ProfileDrawer({
                     Tüm medyayı gör
                   </button>
                 </div>
+
+                {/* 👥 Grup Katılımcıları */}
+                {isGroup && (
+                  <>
+                    <div
+                      className="profile-drawer__section-title"
+                      style={{ marginTop: 16 }}
+                    >
+                      Katılımcılar ({conversation?.members?.length || 0})
+                    </div>
+
+                    <ul className="profile-drawer__members">
+                      {conversation?.members?.map((m) => {
+                        const u = m?.user || {};
+                        const isCreator =
+                          String(conversation?.createdBy?._id) ===
+                          String(u?._id);
+
+                        return (
+                          <li key={u._id} className="member-item">
+                            <Avatar
+                              alt={u.username || "Kullanıcı"}
+                              src={
+                                u.avatar?.url || "/images/default-avatar.jpg"
+                              }
+                              sx={{
+                                width: 42,
+                                height: 42,
+                                borderRadius: "50%",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <div className="member-info">
+                              <div className="member-name-row">
+                                <span className="member-name">
+                                  {u.username || "Bilinmeyen"}
+                                </span>
+                                {isCreator && (
+                                  <span className="member-role">Yönetici</span>
+                                )}
+                              </div>
+
+                              {u.phone && (
+                                <div className="member-phone">{u.phone}</div>
+                              )}
+
+                              {u.about && (
+                                <div className="member-about">{u.about}</div>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )}
 
                 {/* ENGELLE / ŞİKAYET / SİL — ALT ALTA */}
                 <div className="profile-drawer__stack">

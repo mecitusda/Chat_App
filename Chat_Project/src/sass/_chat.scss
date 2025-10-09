@@ -6,8 +6,8 @@
     flex-direction: row;
     flex-wrap: nowrap;
     height: 100vh;  //95 eski datalar.
-    width: 100vw;   //85
-    //margin-top: 2.5rem;
+    width: 100vw;   //85 
+    
     .chat{ 
          &__options{
              background-color: variables.$settings-backend;
@@ -19,7 +19,6 @@
              flex-direction: column;
              gap: 1rem;
              flex-grow: 1;
-             border-radius: 10px 0 0 10px;
              .__top{
                display: flex;
                flex-direction: column;
@@ -296,7 +295,7 @@
                             background-color: variables.$settings-backend;
                         }
                         background-color: variables.$settings-backend;
-                       
+                        
                         display: flex;
                         flex-direction: row;
                         align-items: center;
@@ -307,21 +306,30 @@
                         &:hover{
                             background-color: #00000060;
                         }
+                          .chat__who {
+                            color: #ffffff; // beyaz
+                            font-weight: 400;
+                            font-size: 1.2rem;
+                          }
 
+                          .chat__content {
+                            color: #a5a5a5; // gri veya tema rengi
+                          }
+
+                          mark {
+                            background: transparent;
+                            color: #00aaff; // highlight rengi
+                            font-weight: 600;
+                          }
                         .chat__avatar{
-                            width: 6.5rem;
-                            height: 6.5rem;
-                            border-radius: 50%;
+                            width: 4.7rem;
+                            height: 4.7rem;
                             flex-shrink: 0;
-                            padding: .8rem;
-                            margin-left:.4rem;
+                            margin-left:1rem;
+                   
+                            justify-self: flex-end;
+                            align-self: start;
                             position: relative;
-                            &.is-online::after {
-                              content: "";
-                              position: absolute; right: 2px; bottom: 2px;
-                              width: 10px; height: 10px; border-radius: 50%;
-                              background: #22c55e; border: 2px solid #111B21;
-                            }
                         }
                         .chat__info{
                             flex: 1;
@@ -433,13 +441,19 @@
     button {
       background: none;
       border: none;
-      color: #ff5555;
+      display: flex;
+      gap:1rem;
       font-weight: bold;
       padding: 0.5rem 1rem;
       cursor: pointer;
       width: 100%;
       text-align: left;
       font-size: 1.4rem;
+      align-items: center;
+      .icon{
+        font-size: 2rem;
+        text-align: center;
+      }
       &:hover {
         background: #2a2a2a;
       }
@@ -472,9 +486,11 @@
               display: none;
             }
             &-avatar {
-              width: 3.1rem;
-              height: 3.1rem;
-              border-radius: 50%;
+              width: 3.8rem;
+              height: 3.8rem;
+              &:hover{
+                cursor: pointer;
+              }
             }
 
             &-info {
@@ -497,6 +513,7 @@
               font-weight: 700;
               color: variables.$button-color;
               background-color: transparent;
+              align-items: center;
               border: none;
               cursor: pointer;
               &s{ 
@@ -506,6 +523,153 @@
                 margin-left: auto;}
              
             }
+             .call-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                color: #4caf50;
+                transition: transform 0.2s, color 0.2s;
+
+                &:hover {
+                  transform: scale(1.1);
+                  color: #388e3c;
+                }
+            }
+
+          .active-call-btn {
+              position: relative;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: transparent;
+              border: none;
+              cursor: pointer;
+              color: #2196f3;
+              animation: pulse 1.5s infinite;
+            
+              .call-badge {
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                background: #e53935;
+                color: #fff;
+                border-radius: 50%;
+                font-size: 0.75rem;
+                padding: 2px 6px;
+                font-weight: bold;
+                line-height: 1;
+              }
+          }
+
+          .chat-header__search{
+            border: 1px solid #353535;
+            padding: .7rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            position: relative;
+            transition: all .6s ease;
+          }
+          .search-button{
+            font-size: 1.6rem;
+            &:hover{
+              opacity: 0.6;
+            }
+          }
+          .search-toggle {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            &.expanded{
+              transform: rotate(90deg);
+            }
+          }
+
+         .search-input{
+          width: 0;
+          opacity: 0;
+          padding: 0;
+          height: 100%;
+          font-size: 1.4rem;
+          color: variables.$light-color;
+          background: transparent;
+          border:none;
+          border-radius: 5px;
+          border-bottom: 1px solid #ccc;
+          transition: width 0.4s ease, opacity 0.3s ease;
+          pointer-events: none;
+          &.visible{
+            width: 200px;
+            opacity: 1;
+            padding: 4px 6px;
+            pointer-events: all;
+          }
+         }
+         .divider {
+          height: 80%;
+          width: 1px;
+          background-color: #ccc;
+          margin-left:.5rem
+          
+        }
+         .chat-header__search-nav{
+          padding: .2rem .2rem;
+          display: flex;
+          gap: .8em;
+          align-items: center;
+          .up,.down{
+            padding: .2rem;
+            background-color: transparent;
+            border:none;
+            border-radius: 50%;
+            color: white;
+            &:hover{
+              background-color: #5a5a5a;
+              opacity: 0.8;
+              cursor: pointer;
+              
+            }
+            &:disabled{
+                cursor: default !important;
+              }
+          }
+          span{
+            font-size: 1.2rem;
+          }
+        }
+        .active{
+          display: flex;
+          transform: scale(1);
+        }
+        .closed{
+          margin-right: -6rem;
+          opacity: 0;
+          transform: scale(0);
+          max-height: 0;
+        }
+        
+
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    color: #2196f3;
+  }
+  50% {
+    transform: scale(1.15);
+    color: #64b5f6;
+  }
+  100% {
+    transform: scale(1);
+    color: #2196f3;
+  }
 
         }
 
@@ -519,15 +683,34 @@
       gap: 1rem;
       background-color: #1C1C1C;
       position: relative;
+      scroll-behavior: auto;
+      scrollbar-gutter: stable;
       .message {
+        position: relative;
         max-width: 40%;
+        max-height: 70%;
         padding: .8rem 1rem .5rem 1rem;
         border-radius: 10px 10px 0 10px;
         margin: 4px 0;
         display: inline-block;
         word-wrap: break-word;
         position: relative;
-
+        .avatar{
+          left: -4.6rem;
+          top: .8rem;
+          position: absolute;
+          width: 3.5rem;
+          height: 3.5rem;
+        }
+        .sender{
+          position: absolute;
+          bottom: -1.8rem;
+          left: .3rem;
+          display: inline-block;
+          white-space: nowrap;
+          font-size:1.1rem;
+          
+        }
         &--incoming {
           display: flex;
           flex-direction: column;
@@ -544,7 +727,16 @@
           color: white;
           align-self: flex-end;
         }
+
+        &--highlight {
+          background-color: variables.$highlight-color;
+          /* ya da border: 1px solid gold; */
+        }
         
+        span{
+          max-height: 96%;
+          margin-bottom: .5rem
+        }
         &__content{
           display: flex;
           align-items: flex-end;   /* alt hizada */
@@ -578,23 +770,24 @@
         }
 
         &__status{
-           display: flex;
-  align-items: center;
+          display: flex;
+          align-items: center;
         }
 
         &__status .icon {
-           display: block;            /* baseline etkisini kaldır */
-  width: 14px;
-  height: 14px;
-  vertical-align: middle;    /* ekstra güvenlik */
+          display: block;            /* baseline etkisini kaldır */
+          width: 14px;
+          height: 14px;
+          vertical-align: middle;    /* ekstra güvenlik */
         }
 
-  .icon--sending{ animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+        .icon--sending{ animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
 
         &__media{
-          border-radius: .9rem
+          border-radius: .9rem;
+          max-height: 100%;
         }
       }
       &.no-more{
@@ -631,7 +824,11 @@
       color: #fff;
       border: none;
       border-radius: 0.4rem;
+      height: 100%;
       cursor: pointer;
+      &:hover{
+        opacity: 0.5;
+      }
     }
   }
 
@@ -655,25 +852,30 @@
   }
   }
 
-  &__scrollToBottom{
+  &__scrollToBottom {
   display: flex;
-  position: sticky; /* ya da relative parent'a göre */
+  position: sticky;
   bottom: 1rem;
-  z-index: 10;
-  button{
-  width: 13rem;
-  margin-left: auto;
-  margin-right: 0;
-  background:variables.$notification-color;
-  color: #fff;
-  border: none;
-  border-radius: 20px;
-  padding: .7rem 1.2rem;
-  cursor: pointer;
-  font-size: 14px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 20; // istersen arttır
+  // pointer-events: none; // buton dışındaki boş alan tıklanmasın istiyorsan aç
+  button {
+    // pointer-events: auto; // üst satırı açtıysan bunu da aç
+    width: 13rem;
+    margin-left: auto;
+    background: rgba(variables.$settings-backend, 0.6); // 🔹 yarı saydam
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: .7rem 1.2rem;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: background .2s ease, transform .15s ease, box-shadow .2s ease;
+    &:hover   { background: rgba(variables.$settings-backend, 0.75); transform: translateY(-1px); }
+    &:active  { transform: translateY(0); }
+    &:focus-visible { outline: 2px solid rgba(255,255,255,.5); outline-offset: 2px; }
   }
-  }
+}
 
     }
    
@@ -695,24 +897,25 @@
   }
 
   .friend-send {
-    display: flex;
-    gap: 0.5rem;
-    width: 100%;
-    input {
-      flex: 1;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid variables.$next-backend;
-      border-radius: 6px;
-      background: variables.$next-backend;
-      color: variables.$light-color;
+  display: flex;
+  gap: .5rem;
+  align-items: stretch;
+    .form-control{
+      padding-left: 4rem!important;
     }
+  
 
-    button {
-      @extend .btn;
-      @extend .btn--primary;
-      padding: .3rem .4rem;
-    }
+
+  button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    @extend .btn;
+    @extend .btn--primary;
+     padding: .3rem .4rem;
   }
+
+}
+
 
   .friend-requests__list,
   .friends__list {
@@ -726,7 +929,7 @@
       align-items: center;
       justify-content: space-between;
       background: variables.$next-backend;
-      padding: 0.75rem 1rem;
+      padding: 0.2rem 1rem;
       border-radius: 6px;
       transition: background 0.2s ease;
 
@@ -738,10 +941,10 @@
         display: flex;
         align-items: center;
         gap: 0.75rem;
-
+        border-radius: 50%;
         img {
-          width: 42px;
-          height: 42px;
+          width: 6rem;
+          height: 6rem;
           border-radius: 50%;
           object-fit: cover;
         }
@@ -917,21 +1120,23 @@
           height: 100%;
           overflow-y: scroll;
           .profile{
+           
             &__avatar{
               margin: 3rem auto!important;
               width: 100%;
               display: flex;
               justify-content: center;
-              
+              animation: bounce 3s ease-in-out infinite;
               &__image{
               width: 100%;
               height: 100%;
               object-fit: cover;
               &-wrapper{
+                box-shadow: rgba(61, 61, 61, 0.315) 0px 54px 55px, rgba(61, 61, 61, 0.315) 0px -12px 30px, rgba(61, 61, 61, 0.315) 0px 4px 6px, rgba(61, 61, 61, 0.315) 0px 12px 13px, rgba(61, 61, 61, 0.315) 0px -3px 5px;
               position: relative;
               width: 18rem;
               height: 18rem;
-              border-radius: 50%;
+              border-radius: 20%;
               overflow: hidden;
               cursor: pointer;
               transition: 0.3s;
@@ -1082,7 +1287,7 @@
 .plus-menu {
   position: relative;
   .plus-btn {
-    background-color: variables.$settings-backend !important;
+    background-color: variables.$dark-bg;
     border: none;
     font-size: 2.2rem;
     color: white;
@@ -1091,11 +1296,8 @@
     border-radius: 50%;
     transition: background 0.2s;
 
-    &:hover {
-      background-color: variables.$primary-color !important
-    }
+    
   }
-
   .plus-dropdown {
     position: absolute;
     bottom: 4rem; // Butonun üstünde açılması için
@@ -1173,6 +1375,7 @@
     }
   }
 }
+
 .message__media--video { margin-top: .2rem; }
 .message__media--audio { margin-top: .2rem; }
 
@@ -1208,7 +1411,14 @@
   40% { opacity: 1; transform: translateY(-1px); }
 }
 
-
+@keyframes bounce {
+              0%, 100% {
+                transform: translateY(0);
+              }
+              50% {
+                transform: translateY(-.6rem);
+              }
+  }
 
 
 
@@ -1224,10 +1434,10 @@
   overflow: hidden !important;
   box-sizing: border-box !important;
   
-}
+  }
 
-/* === ALT MENU === */
-   .chat__options {
+  /* === ALT MENU === */
+  .chat__options {
     
     width: 100vw !important;
     max-width: none!important;
@@ -1260,8 +1470,8 @@
     }
   }
   
-/* === CHAT LIST === */
-.chat__list {
+  /* === CHAT LIST === */
+  .chat__list {
   display: none !important;
   overflow: hidden!important;
   &.is-visible {
@@ -1293,94 +1503,99 @@
     }
   }
  
-}
-
-.chat-header {
+  }
+  .chat-header__search{
+    max-height: 41px;
+    span{
+      font-size: 1rem!important;
+       white-space: nowrap;
+    }
+  }
+  .chat-header {
   flex-shrink: 0!important;
   padding: 0.5rem 1rem!important;
   border-bottom: 1px solid #d8bcbc!important;
-}
-
-/* === CHAT PANEL === */
-.chat__panel {
-  
-  display: none !important;
-  
-  box-sizing: border-box;
-  &.is-visible {
-    display: flex !important;
-    flex-direction: column;
-    width: 100%!important;
-    height: 100dvh!important;
-    overflow:visible!important;
   }
-}
 
-.back-btn {
-  display: flex!important;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 15%;
-  border: none;
-  background: variables.$settings-backend;   /* koyu gri buton */
-  color: #fff;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
+  /* === CHAT PANEL === */
+  .chat__panel {
+  
+   display: none !important;
+   
+   box-sizing: border-box;
+   &.is-visible {
+     display: flex !important;
+     flex-direction: column;
+     width: 100%!important;
+     height: 100dvh!important;
+     overflow:visible!important;
+   }
+  }
 
-.back-btn:hover {
+  .back-btn {
+    display: flex!important;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 15%;
+    border: none;
+    background: variables.$settings-backend;   /* koyu gri buton */
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .back-btn:hover {
   background: #3a3f43;   /* hoverda biraz daha açık */
   transform: scale(1.05);
-}
+  }
 
-.back-btn:active {
+  .back-btn:active {
   transform: scale(0.95);
-}
-
-.settings{
-  width: 100%!important;
-   .settings__body{
-    height: 70%!important;
-     overflow-y: scroll;
   }
-}
-.settings-panel{
-  &.not-visible{
-    display: none!important;
+
+  .settings{
+    width: 100%!important;
+     .settings__body{
+      height: 85%!important;
+       overflow-y: scroll;
+    }
   }
- 
-}
-
-
-.friend-requests {
-
-   width: 100%!important;
-
-    .friend-send {
-      flex-direction: column;
-      input{
-        font-size: 2rem!important;
-      }
-      button{
-        font-size: 1.6rem!important;
-      }
+  .settings-panel{
+    &.not-visible{
+      display: none!important;
     }
+  
+  }
 
-    .request-item,
-    .friend-item {
-      flex-direction: column!important;
-      align-items: flex-start!important;
 
-      .right {
-        margin-top: 0.5rem!important;
-        width: 100%!important;
-        justify-content: flex-end!important;
+  .friend-requests {
+
+     width: 100%!important;
+
+      
+      .request-item,
+      .friend-item {
+        flex-direction: column!important;
+        align-items: flex-start!important;
+        .right {
+          margin-top: 0.5rem!important;
+          width: 100%!important;
+          justify-content: flex-end!important;
+        }
       }
-    }
-}
+  }
+  .bg-overlay{
+    align-items:baseline!important;
+
+  }
+  .bg-modal{    
+    margin-top:2rem;
+    height:85dvh!important;
+    font-size: 1.2rem;
+  }
 
 }
 
@@ -1398,6 +1613,8 @@
 
   content: ""; display: inline-block; width: 30%; height: 1px; background:#2d3e47; vertical-align: middle; margin: 0 1rem;
 }
+
+
 
 
 /* Aliases */
@@ -1463,6 +1680,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
         border-bottom: 1px solid #25d366;
       }
     }
+    
   .avatar-upload {
   position: relative;
   display: inline-block;
@@ -1484,7 +1702,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   .avatar-camera {
     position: absolute;
     inset: 0;
-    border-radius: 50%;
+    border-radius: 20%;
     background: rgba(0,0,0,0.4);
     opacity: 0;
     display: flex;
@@ -1502,7 +1720,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
    img {
     width: 120px;
     height: 120px;
-    border-radius: 50%;
+    border-radius: 20%;
     object-fit: cover;
     display: block;
   }
@@ -1512,7 +1730,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
     content: "";
     position: absolute;
     inset: 0;                    // tam otursun
-    border-radius: 50%;          // tam daire
+    border-radius: 20%;          // tam daire
     background: rgba(0, 0, 0, 0); 
     transition: background 0.3s ease;
     pointer-events: none;        // tıklamayı engellemesin
@@ -1538,7 +1756,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
     position: absolute;
     inset: 0; // top:0; right:0; bottom:0; left:0
     background: rgba(0, 0, 0, 0.5); // yarı saydam
-    border-radius: 50%;
+    border-radius: 20%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1553,22 +1771,124 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   }
 
   &__overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.4);
-    opacity: 0; pointer-events: none; transition: opacity .2s ease;
-    z-index: 90;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease-in-out;
+    z-index: 98;
   }
+
   &__panel {
-    position: fixed; top: 0; right: 0; bottom: 0;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
     width: min(100vw, $panel-w);
-    background: $surface; box-shadow: $shadow-3;
-    transform: translateX(100%); transition: transform .28s ease;
-    z-index: 99; display: grid; grid-template-rows: auto 1fr;
+    background: $surface;
+    box-shadow: $shadow-3;
+    transform: translateX(100%); // başlangıçta dışarıda
+    transition: transform 0.35s ease-in-out;
+    z-index: 99;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    .profile-drawer__members {
+      list-style: none;
+      padding: 0;
+      margin: .8rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 100%!important;
+      overflow-y: scroll;
+      margin-bottom:2rem
+    }
+
+    .member-item {
+      display: flex;
+      align-items: flex-start;
+      background-color: rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      padding: 8px 10px;
+      transition: background-color 0.25s ease;
+      cursor: default;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.07);
+      }
+    }
+
+    .member-info {
+      display: flex;
+      flex-direction: column;
+      margin-left: 10px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .member-name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .member-name {
+      font-weight: 500;
+      color: #fff;
+      font-size: 1.2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .member-role {
+      font-size: 1rem;
+      color: #9acd32; /* yeşilimsi vurgulu renk */
+      font-weight: 500;
+    }
+
+    .member-phone {
+      font-size: 1rem;
+      color: variables.$accent;
+      margin-top: 2px;
+    }
+
+    .member-about {
+      font-size: 1rem;
+      color: #888;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+
   }
+  
+
+  // 🔹 Açılırken
   &.is-open {
-    .profile-drawer__overlay { opacity: 1; pointer-events: auto; }
-    .profile-drawer__panel { transform: translateX(0); }
+    .profile-drawer__overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .profile-drawer__panel {
+      transform: translateX(0);
+    }
   }
+
+  // 🔹 Kapanırken
+  &.is-closing {
+    .profile-drawer__overlay {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .profile-drawer__panel {
+      transform: translateX(100%);
+    }
+  }
+
 
   /* Header */
   &__header {
@@ -1616,7 +1936,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
     &.-lg {
       width: 108px;
       height: 108px;
-      border-radius: 50%;
+      border-radius: 10%;
       object-fit: cover;
       border: 1px solid variables.$border;
       box-shadow: 0 6px 18px rgba(0,0,0,.25);
@@ -1770,18 +2090,25 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 
 .notification-banner {
   position: fixed;
-  top: -100px;
+  top: -100px;                 // (animasyonuna karışmıyorum)
   left: 50%;
   transform: translateX(-50%);
-  background-color: variables.$secondary-color;
-  color: #ffcc00;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: bold;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-  opacity: 0;
-  transition: top 0.5s ease-out, opacity 0.5s ease;
   z-index: 9999;
+
+  // 🎨 görünüm
+  background: rgba(25, 25, 25, 0.85);         // koyu, yarı saydam
+  backdrop-filter: blur(6px);                  // cam efekti
+  color: #EAEAEA;                              // okunaklı metin
+  border: 1px solid rgba(255, 255, 255, 0.08); // hafif hat
+  border-radius: 10px;
+  padding: 10px 16px;
+
+  // 🌒 gölge (tek satır; önceki kırmızı gölgeyi kaldırdım)
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  font-weight: 600;
+  opacity: 0;
+  transition: top 0.5s ease-out, opacity 0.5s ease; // (aynı)
 }
 
 .notification-banner.show {
@@ -2017,6 +2344,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   max-width: 400px;
+  animation: bounce 3s ease-in-out infinite;
 }
 
 .settings-title {
@@ -2087,6 +2415,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   text-align: center;
   overflow:visible;
   position: relative;
+  color: #000;
 }
 
 
@@ -2151,7 +2480,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  animation: slideIn 0.3s ease-out;
+  animation: slideInModal 0.3s ease-out;
 }
 
 .modal-card h2 {
@@ -2235,7 +2564,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
   transform: scale(1.05);
 }
 
-@keyframes slideIn {
+@keyframes slideInModal {
   from {
     transform: translateY(-20px);
     opacity: 0;
@@ -2255,7 +2584,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 .group-avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: 20%;
   object-fit: cover;
   border: 2px solid #ffcc00;
   cursor: pointer;
@@ -2270,7 +2599,7 @@ $panel-w: clamp(320px, 30vw, variables.$drawer-width);
 .friend-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 20%;
   object-fit: cover;
   flex-shrink: 0;
 }

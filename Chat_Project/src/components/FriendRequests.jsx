@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useUser } from "../contextAPI/UserContext";
-import { useFriends } from "../hooks/useFriends";
 import FriendList from "./FriendList";
 import { addFriend, removeRequest } from "../slices/friendSlice";
+
+// 📦 Yeni: react-phone-input-2
+import PhoneInput from "react-phone-input-2";
+import "react-phone-input-2/lib/style.css";
 
 export default function FriendRequests({ socket, showNotification }) {
   const { user } = useUser();
   const dispatch = useDispatch();
-  const { requests, friends } = useSelector((state) => state.friends);
-  const [phone, setPhone] = useState("");
+  const { requests } = useSelector((state) => state.friends);
+
+  // PhoneInput değeri: sadece rakamlar (ülke kodu dahil, + işareti YOK)
+  // Örn TR için: 905461562003
+  const [phoneRaw, setPhoneRaw] = useState("");
   const [sending, setSending] = useState(false);
 
-  // İlk yükleme → listeyi çek
+  // İlk yükleme → listeleri çek
   useEffect(() => {
     if (!socket || !user?._id) return;
     socket.emit("friends:requests:list", { userId: user._id });
@@ -20,14 +26,17 @@ export default function FriendRequests({ socket, showNotification }) {
   }, [socket, user?._id]);
 
   const send = () => {
-    if (!phone.trim()) return;
+    // Basit doğrulama (min. 8-9 hane)
+    if (!phoneRaw || phoneRaw.replace(/\D/g, "").length < 9) {
+      showNotification("Lütfen geçerli bir telefon numarası girin 📱");
+      return;
+    }
     setSending(true);
     socket.emit(
       "friends:send-request",
-      { fromUserId: user._id, phone: phone.trim() },
+      { fromUserId: user._id, phone: `+${phoneRaw}` }, // ✅ rakamlı ham değer (örn 9054...)
       (resp) => {
         setSending(false);
-        setPhone("");
         showNotification(resp?.message || "Hata");
       }
     );
@@ -39,12 +48,8 @@ export default function FriendRequests({ socket, showNotification }) {
         showNotification(resp?.message || "Arkadaşlık isteği kabul edilemedi.");
       } else {
         const acceptedUser = requests.find((r) => r._id === resp.friendId);
-
         if (acceptedUser) {
-          // ✅ Arkadaş listesine ekle
           dispatch(addFriend(acceptedUser));
-
-          // ✅ Request listesinden çıkar
           dispatch(removeRequest(resp.friendId));
           showNotification(resp?.message || "Arkadaşlık isteği kabul edildi.");
         }
@@ -57,9 +62,7 @@ export default function FriendRequests({ socket, showNotification }) {
       if (!resp?.success) {
         showNotification(resp?.message || "Arkadaşlık isteği reddedilemedi.");
       } else {
-        // ✅ Request listesinden çıkar
         dispatch(removeRequest(resp.fromUserId));
-
         showNotification(resp?.message || "Arkadaşlık isteği reddedildi 🚫");
       }
     });
@@ -69,20 +72,48 @@ export default function FriendRequests({ socket, showNotification }) {
     <div className="friend-requests panel">
       <h2>Arkadaşlık</h2>
 
-      {/* İstek gönder */}
+      {/* 📲 İstek gönderme alanı */}
       <div className="friend-send">
-        <input
-          type="tel"
-          placeholder="Telefon numarası"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-        <button disabled={sending} onClick={send}>
+        <div className="phone-input" style={{ flex: "1 1 0", minWidth: 0 }}>
+          <PhoneInput
+            key={sending ? "sending" : "ready"}
+            country={"tr"} // 🇹🇷 varsayılan ülke
+            value={phoneRaw}
+            onChange={(value) => setPhoneRaw(value || "")}
+            countryCodeEditable={false} // kullanıcı kodu değiştiremesin
+            inputProps={{
+              name: "phone",
+              placeholder: "(5xx) xxx xx xx",
+            }}
+            inputStyle={{
+              width: "100%",
+              backgroundColor: "#161717",
+              color: "#fff",
+              border: "1px solid #333",
+              borderRadius: "6px",
+              fontSize: "1.5rem",
+              padding: "0.8rem 1rem",
+            }}
+            buttonStyle={{
+              backgroundColor: "#161717", // bayrak arka planı siyah
+              border: "1px solid #333",
+            }}
+            dropdownStyle={{
+              backgroundColor: "#161717",
+              color: "#eaeaea",
+              border: "1px solid #333",
+              zIndex: 9999,
+            }}
+            dropdownClass="dark-dropdown"
+          />
+        </div>
+
+        <button disabled={sending} onClick={send} style={{ flex: "0 0 auto" }}>
           {sending ? "Gönderiliyor..." : "İstek Gönder"}
         </button>
       </div>
 
-      {/* Gelen İstekler */}
+      {/* Gelen istekler */}
       <div className="friend-requests__list">
         <h3>Gelen İstekler</h3>
         {requests.length === 0 ? (
@@ -120,7 +151,6 @@ export default function FriendRequests({ socket, showNotification }) {
       <FriendList
         socket={socket}
         onOpenProfile={(friend) => {
-          // burada modal açabilirsin veya başka sayfaya yönlendirebilirsin
           console.log("Profil aç:", friend);
         }}
         showNotification={showNotification}

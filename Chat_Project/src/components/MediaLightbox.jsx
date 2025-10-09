@@ -2,7 +2,7 @@
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { FiDownload, FiX } from "react-icons/fi";
-
+import { MdOutlineNavigateNext, MdOutlineNavigateBefore } from "react-icons/md";
 export default function MediaLightbox({
   items,
   index,
@@ -220,14 +220,14 @@ export default function MediaLightbox({
               onClick={onPrev}
               aria-label="Önceki"
             >
-              ‹
+              <MdOutlineNavigateBefore />
             </button>
             <button
               className="lightbox__nav lightbox__nav--next"
               onClick={onNext}
               aria-label="Sonraki"
             >
-              ›
+              <MdOutlineNavigateNext />
             </button>
           </>
         )}

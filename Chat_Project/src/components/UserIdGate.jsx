@@ -34,7 +34,6 @@ export default function UserIdGate({
 
         if (data.success) {
           setUser(data.user); // 👈 user’ı context’e kaydet
-          navigate("/chat", { replace: true });
         } else {
           setResetEnabled(true);
           handleClick();

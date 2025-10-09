@@ -81,7 +81,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
     const last_seen = localStorage.getItem("last_seen");
     const onConnect = () => {
       setStatus("connected");
-      if (userId) socket.emit("join", {userId,last_seen}); // server chatList’i emit edecek
+      if (userId) socket.emit("join-chat", {userId,last_seen}); // server chatList’i emit edecek
     };
 
     const onDisconnect = () => setStatus("reconnecting");
@@ -89,7 +89,10 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
     const onReconnectAttempt = () => setStatus("reconnecting");
     const onReconnectFailed = () => setStatus("offline");
 
-    socket.on("presence:update", (p) =>dispatch(setPresence(p)));
+    socket.on("presence:update", (p) =>{
+      dispatch(setPresence(p))
+
+    });
     socket.on("chatList", onChatList);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);

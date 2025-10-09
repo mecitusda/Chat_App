@@ -3,11 +3,11 @@ import s3 from "../config/s3.js"; // senin config dosyan
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import dotenv from "dotenv";
+dotenv.config();
 import Message from "../models/Message.js"
 import Conversation from "../models/Conversation.js";
 import User from "../models/Users.js"
-import { getSignedUrlFromStorage } from "../utils/storage.js";
-dotenv.config();
+
 const router = express.Router();
 
 
