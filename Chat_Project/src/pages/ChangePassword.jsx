@@ -142,11 +142,7 @@ const ChangePassword = () => {
       <div className={`header__inner`} id="header">
         <nav className={`main-nav`}>
           <a href="/" className="main-nav__logo">
-            <img
-              src="../../public/images/logo.png"
-              alt="icon"
-              className="main-nav__icon"
-            />
+            <img src="/images/logo.png" alt="icon" className="main-nav__icon" />
             <h1>criber</h1>
           </a>
         </nav>
