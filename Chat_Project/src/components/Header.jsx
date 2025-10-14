@@ -58,7 +58,7 @@ const Header = ({ scrollTarget }) => {
           className={`picture  scroll-animate ${visible ? "visible" : ""}`}
           ref={ref}
         >
-          <img id="background" src="../../public/images/header.png" alt="" />
+          <img id="background" src="/images/header.png" alt="" />
         </div>
       </div>
 
@@ -69,7 +69,7 @@ const Header = ({ scrollTarget }) => {
             onClick={() => scrollToSection("header")}
           >
             <img
-              src="../../public/images/logo.png"
+              src="/images/logo.png"
               alt="icon"
               className="sticky-nav__icon"
             />

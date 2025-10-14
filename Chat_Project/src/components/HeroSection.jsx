@@ -22,7 +22,7 @@ export default function HeroSection() {
         <div className="hero-title">
           <h1>
             <span>
-              <img src="../../public/images/logo.png" alt="" />
+              <img src="/images/logo.png" alt="" />
               <span id="logo">criber</span>
             </span>{" "}
             <span>ile Tanışın</span>
