@@ -36,7 +36,7 @@ export default function BackgroundSetting({ showNotification }) {
       setLoading(true);
       const fullImageUrl = `/backgrounds/${bgFilename}`;
       const res = await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/settings`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/settings`,
         {
           userId: user._id,
           chatBgImage: fullImageUrl,
@@ -69,7 +69,7 @@ export default function BackgroundSetting({ showNotification }) {
     try {
       setLoading(true);
       const res = await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/settings`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/settings`,
         {
           userId: user._id,
           chatBgColor: color,

@@ -8,7 +8,7 @@ const useOnPageExit = (callback: () => void) => {
       event.preventDefault();
       event.returnValue = "";
     };
-
+    
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {

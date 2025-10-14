@@ -1,7 +1,6 @@
 import { useContext } from "react";
 import { Navigate, Outlet, useOutletContext } from "react-router";
 import { useUser } from "../contextAPI/UserContext";
-
 // import { userContext } from "../contexts/UserContext";
 // Sadece giriş yapmış kullanıcılar erişsin
 export function ProtectedRoute() {

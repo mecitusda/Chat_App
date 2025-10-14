@@ -1,6 +1,7 @@
 @use 'variables';
 @import url('https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css');
+
 *{
     box-sizing: border-box;
     margin: 0;
@@ -68,6 +69,7 @@ ul{
 
 img{
     width: 100%;
+    
 }
 
 
@@ -279,4 +281,137 @@ img{
   border: 1px solid #333!important;
   border-radius: 8px!important;
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.carousel {
+  position: relative;
+  width: 90%; 
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.carousel-viewport {
+  position: relative;
+  aspect-ratio: 16 / 9;      /* 👈 yükseklik otomatik, orana göre */
+}
+
+
+.carousel-inner {
+  position: absolute;
+  inset: 0;                  /* viewport’un tamamını kapla */
+}
+
+.carousel-item {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  image-rendering: pixelated;
+}
+.carousel-item img {
+ width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 16px;
+  image-rendering: -webkit-optimize-contrast;
+  transform: translateZ(0);
+
+}
+
+/* Aktif slide */
+.carousel-item.active { opacity: 1; transform: translateX(0); }
+
+/* Animasyon türü */
+.carousel-item.slide { transition: transform 0.6s ease, opacity 0.6s ease; }
+.carousel-item.fade  { transition: opacity 0.8s ease; }
+
+
+/* Navigation buttons */
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  font-size: 2rem;
+  padding: 8px 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.2s ease;
+}
+.nav:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.nav.prev {
+  left: 12px;
+}
+.nav.next {
+  right: 12px;
+}
+
+/* Dots */
+.dots {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  gap: 8px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #bbb;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.dot.active {
+  background: #fff;
+  width: 24px;
+  border-radius: 6px;
+}
+
+@media (max-width: 1600px) {
+  .carousel {
+    width: 90%;
+  }
+}
+
+@media (max-width: 768px) {
+  .carousel {
+    width: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  .carousel {
+    width: 95%;
+    border-radius: 10px;
+  }
+  .carousel-item img {
+    border-radius: 10px;
+  }
+}
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top: 4px solid #00aaff;
+  border-radius: 50%;
+  height: 4.8rem;
+  width: 4.8rem;
+  position: relative;
+  animation: spin 0.9s linear infinite;
+  margin: 0 auto;
+  // Hafif parlama efekti
+  box-shadow: 0 0 10px rgba(0, 170, 255, 0.3);
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 }

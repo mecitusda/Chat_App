@@ -46,12 +46,61 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.phoneDigits.length !== 10) {
-      alert("Telefon numarasını 10 hane olarak giriniz. (Örn: 5xx xxx xx xx)");
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const usernameRegex = /^[a-zA-Z0-9ğüşöçİıĞÜŞÖÇ\s._-]+$/; // 🔥 boşluk ve Türkçe karakter serbest
+    const phoneRegex = /^[0-9]{10}$/;
+
+    // === 1️⃣ Kullanıcı adı ===
+    if (!form.username.trim()) {
+      showNotification("Kullanıcı adı boş bırakılamaz.");
       return;
     }
-    setLoading(true);
+    if (form.username.trim().length < 3) {
+      showNotification("Kullanıcı adı en az 3 karakter olmalıdır.");
+      return;
+    }
+    if (!usernameRegex.test(form.username.trim())) {
+      showNotification(
+        "Kullanıcı adı yalnızca harf, rakam, boşluk ve nokta içerebilir."
+      );
+      return;
+    }
 
+    // === 2️⃣ E-posta ===
+    if (!form.email.trim()) {
+      showNotification("E-posta adresi giriniz.");
+      return;
+    }
+    if (!emailRegex.test(form.email.trim())) {
+      showNotification("Geçerli bir e-posta adresi giriniz.");
+      return;
+    }
+
+    // === 3️⃣ Telefon ===
+    if (!form.phoneDigits || !phoneRegex.test(form.phoneDigits)) {
+      showNotification(
+        "Telefon numarasını 10 hane olarak giriniz. (Örn: 5xx xxx xx xx)"
+      );
+      return;
+    }
+
+    // === 4️⃣ Şifre ===
+    if (!form.password) {
+      showNotification("Şifre giriniz.");
+      return;
+    }
+    if (form.password.length < 6) {
+      showNotification("Şifre en az 6 karakter olmalıdır.");
+      return;
+    }
+    if (!/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password)) {
+      showNotification("Şifre en az bir büyük harf ve rakam içermelidir.");
+      return;
+    }
+
+    // 🔥 Artık form geçerli, isteği atabiliriz
+    setLoading(true);
     const fullPhone = `${form.countryCode}${form.phoneDigits}`;
 
     try {
@@ -64,88 +113,105 @@ const Register = () => {
           password: form.password,
         }
       );
+
       if (data.success) {
-        showNotification("🔔Başarıyla kayıt olundu.");
+        showNotification("🎉 Başarıyla kayıt olundu!");
         navigate("/verify-email", {
           state: { email: form.email },
           replace: true,
         });
       } else {
-        alert(data.message || "Kayıt başarısız");
+        showNotification(data.message || "Kayıt başarısız.");
       }
     } catch (err) {
       console.error("Register error:", err);
-      alert(err?.response?.data?.message || "Sunucu hatası");
+      showNotification(err?.response?.data?.message || "Sunucu hatası oluştu.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <h2>Kayıt Ol</h2>
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          name="username"
-          placeholder="Kullanıcı adı"
-          onChange={handleBasicChange}
-          value={form.username}
-          required
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="E-posta"
-          onChange={handleBasicChange}
-          value={form.email}
-          required
-        />
-
-        {/* Ülke kodu + maskeli telefon */}
-        <div className="phone-input">
-          <select
-            name="countryCode"
-            value={form.countryCode}
-            onChange={handleBasicChange}
-          >
-            {countryCodes.map((c) => (
-              <option key={c.code} value={c.dial_code}>
-                {c.name} ({c.dial_code})
-              </option>
-            ))}
-          </select>
-
+    <>
+      <div className={`header__inner`} id="header">
+        <nav className={`main-nav`}>
+          <a href="/" className="main-nav__logo">
+            <img
+              src="../../public/images/logo.png"
+              alt="icon"
+              className="main-nav__icon"
+            />
+            <h1>criber</h1>
+          </a>
+        </nav>
+      </div>
+      <div className="auth-container">
+        <h2>Kayıt Ol</h2>
+        <form className="auth-form" onSubmit={handleSubmit}>
           <input
-            type="tel"
-            name="phoneMasked"
-            inputMode="numeric"
-            placeholder="(5xx) xxx xx xx"
-            value={formatPhone10(form.phoneDigits)}
-            onChange={handlePhoneChange}
-            aria-label="Telefon numarası"
+            type="text"
+            name="username"
+            placeholder="Kullanıcı adı"
+            onChange={handleBasicChange}
+            value={form.username}
             required
           />
-        </div>
+          <input
+            type="email"
+            name="email"
+            placeholder="E-posta"
+            onChange={handleBasicChange}
+            value={form.email}
+            required
+          />
 
-        <input
-          type="password"
-          name="password"
-          placeholder="Şifre"
-          onChange={handleBasicChange}
-          value={form.password}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Kaydediliyor..." : "Kayıt Ol"}
-        </button>
-      </form>
+          {/* Ülke kodu + maskeli telefon */}
+          <div className="phone-input">
+            <select
+              name="countryCode"
+              value={form.countryCode}
+              onChange={handleBasicChange}
+            >
+              {countryCodes.map((c) => (
+                <option key={c.code} value={c.dial_code}>
+                  {c.name} ({c.dial_code})
+                </option>
+              ))}
+            </select>
 
-      {/* Link ile garanti gezinme */}
-      <p className="auth-switch">
-        Hesabın var mı? <Link to="/login">Giriş yap</Link>
-      </p>
-    </div>
+            <input
+              type="tel"
+              name="phoneMasked"
+              inputMode="numeric"
+              placeholder="(5xx) xxx xx xx"
+              value={formatPhone10(form.phoneDigits)}
+              onChange={handlePhoneChange}
+              aria-label="Telefon numarası"
+              required
+            />
+          </div>
+
+          <input
+            type="password"
+            name="password"
+            placeholder="Şifre"
+            onChange={handleBasicChange}
+            value={form.password}
+            required
+          />
+          <button type="submit" disabled={loading}>
+            {loading ? "Kaydediliyor..." : "Kayıt Ol"}
+          </button>
+        </form>
+
+        {/* Link ile garanti gezinme */}
+        <p className="auth-switch">
+          <span>
+            Hesabınız var mı? <Link to="/login">Giriş yapın!</Link>
+          </span>
+        </p>
+      </div>
+    </>
   );
 };
 

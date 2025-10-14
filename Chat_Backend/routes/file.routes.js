@@ -160,8 +160,6 @@ router.get("/presigned-url/background", async (req, res) => {
 
 // POST 
 
-
-
 router.post("/presigned-url/avatars", async (req, res) => {
   try {
     const { expiredAvatars } = req.body; // [{conversationId, type}, {userId, conversationId, type}]
@@ -208,37 +206,6 @@ router.post("/presigned-url/avatars", async (req, res) => {
     res.status(500).json({ success: false, error: "Avatar presigned alınamadı" });
   }
 });
-
-// router.post("/presigned-url/bgImages", async (req, res) => {
-//   const { backgrounds } = req.body; 
-//   if (!Array.isArray(backgrounds) || backgrounds.length === 0) {
-//     return res.status(400).json({ error: "backgrounds boş olamaz" });
-//   }
-
-//   try {
-//     const urls = await Promise.all(
-//       backgrounds.map(async (bg) => {
-//         const command = new GetObjectCommand({
-//           Bucket: process.env.AWS_BUCKET_NAME,
-//           Key: bg.media_key,
-//         });
-//         const url = await getSignedUrl(s3, command, { expiresIn: 86400 });
-
-//         return {
-//           ...bg,
-//           media_url: url,
-//         };
-//       })
-//     );
-
-//     return res.json(urls);
-//   } catch (error) {
-//     console.error("bgImage presigned hatası:", error);
-//     return res.status(500).json({ error: "bgImage URL'leri alınamadı" });
-//   }
-// });
-
-
 
 router.post("/presigned-url/files", async (req, res) => {
   const { messageIds } = req.body;

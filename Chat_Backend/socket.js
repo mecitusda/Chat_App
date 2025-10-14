@@ -131,7 +131,7 @@ io.on("connection", (socket) => {
   let currentUserId = null;
   
 
-  socket.on("join-chat", async ({userId,last_seen}) => {
+  socket.on("join-chat", async ({userId}) => {
   currentUserId = String(userId);
   socket.data.userId = String(userId || "");
   
@@ -147,7 +147,7 @@ io.on("connection", (socket) => {
       `${BACKEND_URL}/api/conversation/message/mark-delivered`,
       {
         by: currentUserId,
-        since: last_seen,
+        since: await getLastSeen(currentUserId),
       }
     );
 
@@ -185,7 +185,7 @@ io.on("connection", (socket) => {
     // 5) Chat listesini client’a gönder
     socket.emit("chatList", conversations);
 
-    const { data: rq } = await axios.get(`${BACKEND_URL}/api/auth/friends/requests/${userId}`);
+    const { data: rq } = await axios.get(`${BACKEND_URL}/api/user/friends/requests/${userId}`);
     socket.emit("friends:requests:list", { success: true, requests: rq.requests || [] });
 
     console.log(`${userId} joined, chat list + delivered patch sent.`);
@@ -431,7 +431,7 @@ io.on("connection", (socket) => {
   
   socket.on("message:delivered", async ({ messageId, conversationId, userId }) => {
   try {
-    console.log("iletildi: ",{ messageId, conversationId, userId })
+    //console.log("iletildi: ",{ messageId, conversationId, userId })
     await axios.patch(`${BACKEND_URL}/api/conversation/message/status`, {
       ids: [messageId],
       action: "delivered",
@@ -474,7 +474,7 @@ io.on("connection", (socket) => {
 
   socket.on("friends:requests:list", async ({ userId }) => {
     try {
-      const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/requests/${userId}`);
+      const { data } = await axios.get(`${BACKEND_URL}/api/user/friends/requests/${userId}`);
       socket.emit("friends:requests:list", { success: true, requests: data.requests || [] });
     } catch (err) {
       console.error("friends:requests:list error:", err?.response?.data || err?.message);
@@ -484,7 +484,7 @@ io.on("connection", (socket) => {
 
   socket.on("friends:list:get", async ({ userId }) => {
     try {
-      const { data } = await axios.get(`${BACKEND_URL}/api/auth/friends/${userId}`);
+      const { data } = await axios.get(`${BACKEND_URL}/api/user/friends/${userId}`);
       socket.emit("friends:list", { success: true, friends: data.friends || [] });
     } catch (err) {
       console.error("friends:list:get error:", err?.response?.data || err?.message);
@@ -495,7 +495,7 @@ io.on("connection", (socket) => {
   // Arkadaşlık isteği gönder (numarayla veya toUserId ile)
   socket.on("friends:send-request", async ({ fromUserId, phone }, ack) => {
     try {
-      const { data } = await axios.post(`${BACKEND_URL}/api/auth/friends/request`, {
+      const { data } = await axios.post(`${BACKEND_URL}/api/user/friends/request`, {
       fromUserId,
       phone,
       });
@@ -542,7 +542,7 @@ io.on("connection", (socket) => {
   socket.on("friends:accept", async ({ userId, fromUserId }, ack) => {
     try {
       const { data } = await axios.patch(
-        `${BACKEND_URL}/api/auth/friends/accept`,
+        `${BACKEND_URL}/api/user/friends/accept`,
         { userId, fromUserId }
       );
 
@@ -571,7 +571,7 @@ io.on("connection", (socket) => {
   socket.on("friends:reject", async ({ userId, fromUserId }, ack) => {
     try { 
     const { data } = await axios.patch(
-      `${BACKEND_URL}/api/auth/friends/reject`,
+      `${BACKEND_URL}/api/user/friends/reject`,
       { userId, fromUserId }
     );
 
@@ -600,7 +600,7 @@ io.on("connection", (socket) => {
   socket.on("friends:remove", async ({ userId, friendId }, ack) => {
   try {
     const { data } = await axios.patch(
-      `${BACKEND_URL}/api/auth/friends/remove`,
+      `${BACKEND_URL}/api/user/friends/remove`,
       { userId, friendId }
     );
 
@@ -686,7 +686,7 @@ io.on("connection", (socket) => {
       }
 
       const updatedConv = data.conversation;
-      console.log("updatedChat: ",updatedConv)
+      //console.log("updatedChat: ",updatedConv)
       // 2) Tüm üyelere yayınla (chat listelerini güncellemek için)
       for (const m of updatedConv.members.map(mem => mem.user._id)) {
         socket.to(`user:${String(m)}`).emit("chatList:update", {
@@ -777,7 +777,7 @@ io.on("connection", (socket) => {
     "call:create-or-join",
     async ({ conversationId, userId, callType, conversationType, peers }, ack) => {
       try {
-        const { data } = await axios.post(`${BACKEND_URL}/api/conversation/join`, {
+        const { data } = await axios.post(`${BACKEND_URL}/api/call/join`, {
           conversationId,
           callerId: userId,
           callType,
@@ -845,11 +845,11 @@ io.on("connection", (socket) => {
    socket.on("leave-call", async ({ userId, callId,conversationId }) => {
     const uid = String(userId);
     socket.leave(`call:${callId}`);
-    console.log("kullanıcı çıktı.",{ userId, callId,conversationId })
+    //console.log("kullanıcı çıktı.",{ userId, callId,conversationId })
     socket.to(`call:${callId}`).emit("call:user-left", { userId: uid });
   
     try{
-    await axios.post(`${BACKEND_URL}/api/conversation/leave`, {
+    await axios.post(`${BACKEND_URL}/api/call/leave`, {
       userId: uid,
       callId,
     });

@@ -15,7 +15,6 @@ export default function UserIdGate({
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem("token");
-
       if (!token) {
         clearUser();
         setLoading(false);
@@ -25,7 +24,7 @@ export default function UserIdGate({
 
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/api/auth/me`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/me`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -55,7 +54,7 @@ export default function UserIdGate({
   }, []);
 
   if (loading) {
-    return <div className="loading">🔄 Giriş kontrol ediliyor...</div>;
+    return <div className="loading"></div>;
   }
 
   return null;

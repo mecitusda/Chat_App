@@ -47,11 +47,6 @@ const Chat = () => {
     activeConversation,
     setActiveConversation,
     SOCKET_URL,
-    setResetEnabled,
-    handleClick,
-    resetEnabled,
-    banner,
-    setBanner,
     showNotification,
     activeConversationId,
     setactiveConversationId,
@@ -68,8 +63,8 @@ const Chat = () => {
   const messagesByConv = useSelector((s) => s.messages?.byConversation || {});
   const filesByConv = useSelector((s) => s.files?.byKey || {});
   const { requests, friends } = useSelector((state) => state.friends);
-  const uis = useSelector((s) => s.ui.atBottomByConv || []);
-  const pres = useSelector((state) => state.presences.byUser);
+  const [spinner, setSpinner] = useState(false);
+
   //console.log("pres: ", pres);
   //console.log("arkadaşlar: ", friends);
   //console.log("chatler: ", conversations);
@@ -89,7 +84,8 @@ const Chat = () => {
     addOrUpdateConversations,
     conversations,
     friends,
-    dispatch
+    dispatch,
+    setSpinner
   );
 
   useFriends({ socket, showNotification }); // socket listener’ları Redux’a bağlar
@@ -618,6 +614,7 @@ const Chat = () => {
             setActiveConversation={setActiveConversation}
             showNotification={showNotification}
             activeConversation={activeConversation}
+            spinner={spinner}
           />
         )}
 

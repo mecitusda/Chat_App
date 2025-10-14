@@ -1,5 +1,10 @@
 import { createSlice } from "@reduxjs/toolkit";
-
+const playNotificationSound = () => {
+  const audio = new Audio("/sounds/new-invitation.mp3");
+  audio.play().catch((error) => {
+    console.warn("🔇 Ses çalınamadı:", error);
+  });
+};
 const initialState = {
   friends: [],   // arkadaş listesi
   requests: [],  // gelen arkadaşlık istekleri
@@ -28,6 +33,7 @@ const friendsSlice = createSlice({
       const exists = state.requests.find((r) => r._id === action.payload._id);
       if (!exists) {
         state.requests.push(action.payload);
+        playNotificationSound()
       }
     },
     removeRequest(state, action) {

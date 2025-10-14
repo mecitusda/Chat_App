@@ -4,6 +4,7 @@ import { addOrUpdateConversations } from "../slices/conversationSlice";
 import axios from "axios";
 import { useEffect } from "react";
 import Avatar from "@mui/material/Avatar";
+import { useOutletContext } from "react-router";
 export default function ProfileDrawer({
   onClose,
   conversation,
@@ -17,6 +18,7 @@ export default function ProfileDrawer({
   avatar,
   socket,
 }) {
+  const { showNotification } = useOutletContext();
   const [animateState, setAnimateState] = useState("closed");
   const isGroup = conversation?.type === "group";
   const dispatch = useDispatch();
@@ -111,7 +113,14 @@ export default function ProfileDrawer({
 
   // ✅ Grup adı güncelleme handler
   const handleNameChange = async () => {
-    if (!newName || newName === conversation?.name) return;
+    if (!newName) {
+      showNotification("❌ Lütfen bir grup adı giriniz.");
+      return;
+    }
+    if (newName === conversation?.name) {
+      showNotification("❌ Lütfen farklı bir grup adı giriniz.");
+      return;
+    }
     socket.emit(
       "conversation:update",
       {
@@ -121,9 +130,10 @@ export default function ProfileDrawer({
       },
       (res) => {
         if (res.success) {
+          showNotification("✅ Grup adı başarıyla değiştirildi.");
           dispatch(addOrUpdateConversations([res.conversation]));
         } else {
-          console.error("❌ Grup adı update failed:", res.message);
+          showNotification("❌ Grup adı update failed:", res.message);
         }
       }
     );
@@ -196,7 +206,6 @@ export default function ProfileDrawer({
                         className="profile-drawer__name-edit"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        onBlur={handleNameChange} // blur’da kaydet
                         onKeyDown={(e) =>
                           e.key === "Enter" && handleNameChange()
                         }
@@ -221,53 +230,49 @@ export default function ProfileDrawer({
 
                 {/* Hakkında */}
                 {(display.about || !isGroup) && (
-                  <>
+                  <div className="about">
                     <div className="profile-drawer__section-title">
                       Hakkında
                     </div>
                     <div className="profile-drawer__about">
                       {display.about || "Henüz bir açıklama yok."}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Medya (küçük grid) */}
-                <div
-                  className="profile-drawer__section-title"
-                  style={{ marginTop: 16 }}
-                >
-                  Medya
-                </div>
-                <div className="profile-drawer__media-grid">
-                  {mediaThumbs.map((m, i) => (
+                <div className="medias">
+                  <div className="profile-drawer__section-title">Medya</div>
+                  <div className="profile-drawer__media-grid">
+                    {mediaThumbs.map((m, i) => (
+                      <button
+                        key={`${m.src}_${i}`}
+                        type="button"
+                        className="media-item -as-btn"
+                        onClick={() => openBySrc(m.src)} // GLOBAL LIGHTBOX
+                        aria-label="Medyayı aç"
+                      >
+                        {m.type === "video" ? (
+                          <video src={m.src} muted playsInline />
+                        ) : (
+                          <img src={m.src} alt={`media-${i}`} />
+                        )}
+                      </button>
+                    ))}
                     <button
-                      key={`${m.src}_${i}`}
                       type="button"
-                      className="media-item -as-btn"
-                      onClick={() => openBySrc(m.src)} // GLOBAL LIGHTBOX
-                      aria-label="Medyayı aç"
+                      className="profile-drawer__btn -ghost"
+                      style={{ gridColumn: "1 / -1", marginTop: 4 }}
+                      onClick={() => setView("media")}
                     >
-                      {m.type === "video" ? (
-                        <video src={m.src} muted playsInline />
-                      ) : (
-                        <img src={m.src} alt={`media-${i}`} />
-                      )}
+                      <i className="fa-regular fa-images" />
+                      Tüm medyayı gör
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="profile-drawer__btn -ghost"
-                    style={{ gridColumn: "1 / -1", marginTop: 4 }}
-                    onClick={() => setView("media")}
-                  >
-                    <i className="fa-regular fa-images" />
-                    Tüm medyayı gör
-                  </button>
+                  </div>
                 </div>
-
                 {/* 👥 Grup Katılımcıları */}
                 {isGroup && (
-                  <>
+                  <div className="profile-drawer__members">
                     <div
                       className="profile-drawer__section-title"
                       style={{ marginTop: 16 }}
@@ -275,7 +280,7 @@ export default function ProfileDrawer({
                       Katılımcılar ({conversation?.members?.length || 0})
                     </div>
 
-                    <ul className="profile-drawer__members">
+                    <ul className="member_items">
                       {conversation?.members?.map((m) => {
                         const u = m?.user || {};
                         const isCreator =
@@ -318,10 +323,9 @@ export default function ProfileDrawer({
                         );
                       })}
                     </ul>
-                  </>
+                  </div>
                 )}
 
-                {/* ENGELLE / ŞİKAYET / SİL — ALT ALTA */}
                 <div className="profile-drawer__stack">
                   <button
                     className="profile-drawer__btn -danger disabled-tip"

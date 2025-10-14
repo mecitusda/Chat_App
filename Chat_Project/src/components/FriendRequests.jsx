@@ -7,12 +7,13 @@ import { addFriend, removeRequest } from "../slices/friendSlice";
 // 📦 Yeni: react-phone-input-2
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
+import { useOutletContext } from "react-router";
 
-export default function FriendRequests({ socket, showNotification }) {
+export default function FriendRequests({ socket }) {
   const { user } = useUser();
   const dispatch = useDispatch();
   const { requests } = useSelector((state) => state.friends);
-
+  const { showNotification } = useOutletContext();
   // PhoneInput değeri: sadece rakamlar (ülke kodu dahil, + işareti YOK)
   // Örn TR için: 905461562003
   const [phoneRaw, setPhoneRaw] = useState("");
@@ -40,6 +41,14 @@ export default function FriendRequests({ socket, showNotification }) {
         showNotification(resp?.message || "Hata");
       }
     );
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
   };
 
   const accept = (fromUserId) => {
@@ -105,6 +114,7 @@ export default function FriendRequests({ socket, showNotification }) {
               zIndex: 9999,
             }}
             dropdownClass="dark-dropdown"
+            onKeyDown={handleKeyDown}
           />
         </div>
 

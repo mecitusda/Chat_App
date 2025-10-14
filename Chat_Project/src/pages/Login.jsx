@@ -4,6 +4,7 @@ import axios from "axios";
 import { fetchCountryDialCodes } from "../utils/countryCodes";
 import { formatPhone10 } from "../utils/phoneFormat";
 import { useUser } from "../contextAPI/UserContext";
+import Header from "../components/Header";
 
 const Login = () => {
   const { showNotification } = useOutletContext();
@@ -39,7 +40,11 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.phoneDigits.length !== 10) {
-      alert("Telefon numarasını 10 hane olarak giriniz.");
+      showNotification("Telefon numarasını 10 hane olarak giriniz.");
+      return;
+    }
+    if (form.password.length < 3) {
+      showNotification("Şifre en az 6 karakter olmalıdır.");
       return;
     }
     setLoading(true);
@@ -64,58 +69,77 @@ const Login = () => {
       }
     } catch (err) {
       console.error("Login error:", err);
-      alert(err?.response?.data?.message || "Sunucu hatası");
+      showNotification(err?.response?.data?.message || "Sunucu hatası");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <h2>Giriş Yap</h2>
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <div className="phone-input">
-          <select
-            name="countryCode"
-            value={form.countryCode}
-            onChange={handleBasicChange}
-          >
-            {countryCodes.map((c) => (
-              <option key={c.code} value={c.dial_code}>
-                {c.name} ({c.dial_code})
-              </option>
-            ))}
-          </select>
+    <>
+      <div className={`header__inner`} id="header">
+        <nav className={`main-nav`}>
+          <a href="/" className="main-nav__logo">
+            <img
+              src="../../public/images/logo.png"
+              alt="icon"
+              className="main-nav__icon"
+            />
+            <h1>criber</h1>
+          </a>
+        </nav>
+      </div>
+      <div className="auth-container">
+        <h2>Giriş Yap</h2>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="phone-input">
+            <select
+              name="countryCode"
+              value={form.countryCode}
+              onChange={handleBasicChange}
+            >
+              {countryCodes.map((c) => (
+                <option key={c.code} value={c.dial_code}>
+                  {c.name} ({c.dial_code})
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="tel"
+              name="phoneMasked"
+              inputMode="numeric"
+              placeholder="(5xx) xxx xx xx"
+              value={formatPhone10(form.phoneDigits)}
+              onChange={handlePhoneChange}
+              aria-label="Telefon numarası"
+              required
+            />
+          </div>
 
           <input
-            type="tel"
-            name="phoneMasked"
-            inputMode="numeric"
-            placeholder="(5xx) xxx xx xx"
-            value={formatPhone10(form.phoneDigits)}
-            onChange={handlePhoneChange}
-            aria-label="Telefon numarası"
+            type="password"
+            name="password"
+            placeholder="Şifre"
+            onChange={handleBasicChange}
+            value={form.password}
             required
           />
-        </div>
+          <button type="submit" disabled={loading}>
+            {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+          </button>
+        </form>
 
-        <input
-          type="password"
-          name="password"
-          placeholder="Şifre"
-          onChange={handleBasicChange}
-          value={form.password}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
-        </button>
-      </form>
-
-      <p className="auth-switch">
-        Hesabın yok mu? <Link to="/register">Kayıt ol</Link>
-      </p>
-    </div>
+        <p className="auth-switch">
+          <span>
+            Hesabınız yok mu? <Link to="/register">Kayıt olun</Link>
+          </span>
+          <span>
+            <Link to="/change-password"> Şifrenizi mi unuttunuz?</Link>
+          </span>
+        </p>
+      </div>
+    </>
   );
 };
 

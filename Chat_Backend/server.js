@@ -18,11 +18,15 @@ import fileRouter from './routes/file.routes.js';
 import authRouter from './routes/auth.routes.js';
 import conversationRouter from './routes/conversation.routes.js';
 import callRouter from "./routes/call.routes.js"
+import userRouter from "./routes/user.routes.js"
+import contactRouter from "./routes/contact.routes.js"
+
 app.use('/api/file', fileRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/conversation', conversationRouter);
-app.use('/api/call', callRouter)
-
+app.use('/api/call', callRouter);
+app.use('/api/user', userRouter)
+app.use('/api/contact', contactRouter)
 initRedis().then(() => {
   app.listen(process.env.PORT || 5000, () => {
     console.log(`Server running on port ${process.env.PORT || 5000}`);

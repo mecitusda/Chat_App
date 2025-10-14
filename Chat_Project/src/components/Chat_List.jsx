@@ -12,12 +12,20 @@ import DropdownMenu from "./DropdownMenu";
 import { useUser } from "../contextAPI/UserContext";
 import { useSelector } from "react-redux";
 import Avatar from "@mui/material/Avatar";
+import { FiVideo, FiMic } from "react-icons/fi";
+import { BsImage } from "react-icons/bs";
+import { HiOutlineDocument, HiOutlineDocumentText } from "react-icons/hi2";
+import { MdGifBox } from "react-icons/md";
+import { PiStickerDuotone } from "react-icons/pi";
+import Spinner from "./Spinner";
+
 // ==== helpers ====
 const MAX_SCAN_MSGS = 60; // içerik aramada taranacak mesaj sayısı (son N)
 const norm = (s) => (s || "").toString().toLowerCase();
 const trimSpaces = (s) => (s || "").toString().trim();
 const EMPTY = [];
 const FALLBACK_AVATAR = "/images/default-avatar.jpg";
+
 function formatSimpleTime(iso) {
   if (!iso) return "";
   const now = new Date();
@@ -73,7 +81,13 @@ const ChatListItem = memo(function ChatListItem({
   return (
     <li className="chat__item" onClick={() => onSelect(conversation._id)}>
       <Avatar
-        alt="Remy Sharp"
+        alt={
+          isPrivate
+            ? conversation.members[0].user._id === userId
+              ? conversation.members[0].user.username
+              : conversation.members[1].user.username
+            : conversation.name
+        }
         src={avatarUrl || FALLBACK_AVATAR}
         className="chat__avatar"
       />
@@ -121,6 +135,7 @@ export default function ChatList({
   socket,
   showNotification,
   activeConversationId,
+  spinner,
 }) {
   // search state
   const [query, setQuery] = useState("");
@@ -154,28 +169,72 @@ export default function ChatList({
   function formatMessagePreview(conversation, user) {
     if (!conversation?.last_message) return { who: "", content: "" };
 
-    const type = conversation.last_message?.type;
-    const senderId = conversation?.last_message?.message?.sender;
+    const { message, type } = conversation.last_message;
+    const senderId = message?.sender;
     let who = "";
 
+    // 👥 Grupsa, kim göndermiş belirle
     if (conversation.type === "group") {
       const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
       if (!mem) return { who: "", content: "" };
-      who = mem?.user._id !== user?._id ? mem?.user.username : "Sen";
+      who = mem?.user._id !== user?._id ? mem?.user.username : "Sen  ";
     }
 
+    // 🧩 Tip ikonları
     const map = {
-      text: conversation?.last_message?.message?.text || "",
-      image: "🖼️ Görsel",
-      video: "🎥 Video",
-      audio: "🎵 Ses Kaydı",
-      file: "📎 Belge",
-      document: "📎 Belge",
-      sticker: "💬 Sticker",
-      gif: "🎞️ GIF",
+      text: message?.text || "",
+      image: (
+        <>
+          <BsImage />
+        </>
+      ),
+      video: (
+        <>
+          <FiVideo />
+        </>
+      ),
+      audio: (
+        <>
+          <FiMic />
+        </>
+      ),
+      file: (
+        <>
+          <HiOutlineDocument />
+        </>
+      ),
+      document: (
+        <>
+          <HiOutlineDocumentText />
+        </>
+      ),
+      sticker: (
+        <>
+          <PiStickerDuotone />
+        </>
+      ),
+      gif: (
+        <>
+          <MdGifBox />
+        </>
+      ),
     };
 
-    const content = map[type] || "Henüz mesaj gönderilmedi.";
+    // 🔧 Metin + ikon birleşimi
+    let content;
+    if (type === "text") {
+      content = message?.text || "";
+    } else {
+      const iconPart = map[type] || "Mesaj";
+      const textPart = message?.text ? `  ${message.text}` : "";
+      content = (
+        <>
+          {iconPart}
+          {textPart}
+        </>
+      );
+    }
+
     return { who, content };
   }
 
@@ -441,6 +500,7 @@ export default function ChatList({
             Gruplar
           </button>
         </div>
+        {spinner && conversations.length === 0 && <Spinner />}
         {/* === 2) Kişiler === */}
         {filteredFriends?.length > 0 && (
           <div className="search-section">
@@ -452,9 +512,9 @@ export default function ChatList({
                   className="chat__item -friend"
                   onClick={() => onSelectFriend(f.friend)}
                 >
-                  <img
-                    src={f.friend.avatar?.url || FALLBACK_AVATAR}
+                  <Avatar
                     alt={f.friend.username}
+                    src={f.friend.avatar?.url || FALLBACK_AVATAR}
                     className="chat__avatar"
                   />
                   <div className="chat__info">

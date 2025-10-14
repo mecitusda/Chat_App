@@ -24,7 +24,7 @@ const sendMail = async(to,message) => {
   });//Bu kısımda mailer servisine ait bilgileri yazıyoruz.
 
   const mailerOptions = {
-    from:`Wazzap <${process.env.MAILER_MAIL}>`,
+    from:`Scriber <${process.env.MAILER_MAIL}>`,
     to:to,
     subject:message.subject,
     html:message.html

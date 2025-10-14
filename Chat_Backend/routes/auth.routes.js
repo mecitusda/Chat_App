@@ -3,158 +3,101 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/Users.js";
-import Call from "../models/Call.js"
 import dotenv from "dotenv";
 import crypto from "crypto";
 dotenv.config();
-import {client} from "../utils/redis.js"
+import { client as redis } from "../utils/redis.js";
 const router = express.Router();
 import sendMail from "../config/mailSender.js"
-import {mongoose} from "mongoose"
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const RESET_CODE_TTL_SEC = 120; // 2 dakika
+const RESET_JWT_TTL = "5m";
+// POST
 
-import {authMiddleware } from "../middleware/auth.js"
-// Register
 router.post("/register", async (req, res) => {
   try {
     const { username, email, phone, password } = req.body;
 
-    // Zorunlu alan kontrolü
     if (!username || !email || !phone || !password) {
       return res.status(400).json({ success: false, message: "Tüm alanlar zorunlu" });
     }
 
-    // Kullanıcı var mı?
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }, { phone }],
-    });
+    const existingUser = await User.findOne({ $or: [{ username }, { email }, { phone }] });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "Kullanıcı zaten kayıtlı" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 6 haneli kod
     const verifyCode = crypto.randomInt(100000, 999999).toString();
+
+    // Kullanıcıyı oluştur (DB’de saklamak istiyorsan alanlar kalabilir ama şart değil)
     const user = await User.create({
       username,
       email,
       phone,
       password_hash: hashedPassword,
-      verifyCode,
-      verifyCodeExpires: Date.now() + 10 * 60 * 1000, // 10 dk geçerli
+      // İstersen bu iki alanı artık kullanma; Redis TTL zaten daha güvenli:
+      verifyCode,                           // (opsiyonel)
+      verifyCodeExpires: Date.now() + 2 * 60 * 1000, // (opsiyonel) 2 dk
+      emailVerified: false,
     });
 
-    const emailTemplate =  `<!DOCTYPE html>
+    await redis.set(`verify:${email}`, verifyCode, { EX: 120 }); // 120sn
+
+    // Mail şablonu
+    const emailTemplate = `<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>E-posta Doğrulama</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f6f6f6;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
-    }
-    .header {
-      background: linear-gradient(135deg, #6a11cb, #2575fc);
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 24px;
-    }
-    .body {
-      padding: 30px;
-      color: #333;
-      line-height: 1.6;
-      text-align: center;
-    }
-    .body h2 {
-      margin-top: 0;
-      color: #6a11cb;
-    }
-    .code-box {
-      display: inline-block;
-      margin: 20px 0;
-      padding: 14px 24px;
-      background: #f1f1f1;
-      border-radius: 8px;
-      font-weight: bold;
-      font-size: 24px;
-      letter-spacing: 8px;
-      color: #2575fc;
-      border: 2px dashed #2575fc;
-    }
-    .footer {
-      text-align: center;
-      padding: 15px;
-      font-size: 12px;
-      color: #888;
-      background: #f1f1f1;
-    }
-    .footer a {
-      color: #2575fc;
-      text-decoration: none;
-    }
+    body { font-family: Arial, sans-serif; background-color: #f6f6f6; margin:0; padding:0; }
+    .container { max-width:600px; margin:40px auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.1); }
+    .header { background:linear-gradient(135deg, #6a11cb, #2575fc); color:#fff; padding:20px; text-align:center; }
+    .header h1 { margin:0; font-size:24px; }
+    .body { padding:30px; color:#333; line-height:1.6; text-align:center; }
+    .body h2 { margin-top:0; color:#6a11cb; }
+    .code-box { display:inline-block; margin:20px 0; padding:14px 24px; background:#f1f1f1; border-radius:8px; font-weight:bold; font-size:24px; letter-spacing:8px; color:#2575fc; border:2px dashed #2575fc; }
+    .footer { text-align:center; padding:15px; font-size:12px; color:#888; background:#f1f1f1; }
+    .footer a { color:#2575fc; text-decoration:none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- HEADER -->
-    <div class="header">
-      <h1>Chat Uygulaması</h1>
-    </div>
-
-    <!-- BODY -->
+    <div class="header"><h1>Chat Uygulaması</h1></div>
     <div class="body">
       <h2>Merhaba {{username}},</h2>
-      <p>
-        Hesabını doğrulamak için aşağıdaki <strong>doğrulama kodunu</strong> kullanabilirsin:
-      </p>
-      <div class="code-box">
-        {{verifyCode}}
-      </div>
-      <p>
-        Bu kod <strong>10 dakika</strong> boyunca geçerlidir. 
-      </p>
-      <p>
-        Eğer bu isteği sen yapmadıysan bu e-postayı görmezden gelebilirsin.
-      </p>
+      <p>Hesabını doğrulamak için aşağıdaki <strong>doğrulama kodunu</strong> kullanabilirsin:</p>
+      <div class="code-box">{{verifyCode}}</div>
+      <p>Bu kod <strong>2 dakika</strong> boyunca geçerlidir.</p>
+      <p>Eğer bu isteği sen yapmadıysan bu e-postayı görmezden gelebilirsin.</p>
     </div>
-
-    <!-- FOOTER -->
     <div class="footer">
-      <p>Bu e-posta otomatik olarak gönderilmiştir. Soruların varsa 
-      <a href="mailto:support@chatapp.com">support@chatapp.com</a> üzerinden bize ulaşabilirsin.</p>
+      <p>Bu e-posta otomatik olarak gönderilmiştir. Soruların varsa
+      <a href="mailto:usda.mecit@gmail.com">usda.mecit@gmail.com</a> üzerinden bize ulaşabilirsin.</p>
     </div>
   </div>
 </body>
-</html>
-    `;
-    const html = emailTemplate
-  .replace("{{username}}", user.username)
-  .replace("{{verifyCode}}", verifyCode);
+</html>`;
 
-    sendMail(user.email,{subject:"Email Doğrulaması",html})
-    
-    res.status(201).json({ success: true, message: "Kayıt başarılı, e-posta doğrulama bekleniyor" });
+    const html = emailTemplate
+      .replace("{{username}}", user.username)
+      .replace("{{verifyCode}}", verifyCode);
+
+    await sendMail(user.email, { subject: "Email Doğrulaması", html });
+
+    return res.status(201).json({
+      success: true,
+      message: "Kayıt başarılı, e-posta doğrulama bekleniyor",
+    });
   } catch (err) {
     console.error("Register error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
+    return res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
-
-// 📌 LOGIN
 router.post("/login", async (req, res) => {
   try {
     const { phone, password } = req.body;
@@ -199,7 +142,7 @@ router.post("/logout", async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
-
+    console.log("token:",token)
     if (!token) {
       return res.status(400).json({ success: false, message: "Token bulunamadı" });
     }
@@ -212,7 +155,7 @@ router.post("/logout", async (req, res) => {
     // Token expire süresine kadar blacklist’te tut
     const ttl = decoded.exp - Math.floor(Date.now() / 1000);
 
-    await client.setEx(`blacklist:${token}`, ttl, "true");
+    await redis.setEx(`blacklist:${token}`, ttl, "true");
     return res.json({ success: true, message: "Çıkış yapıldı" });
   } catch (err) {
     console.error("Logout error:", err);
@@ -220,419 +163,331 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-router.get("/me", authMiddleware, async (req, res) => {
+router.post("/send-reset-code", async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password_hash -__v");
-    if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: "E-posta zorunlu" });
 
-    res.json({ success: true, user });
+    const user = await User.findOne({ email });
+    if (!user) return res.json({ success: true, message: "Kod gönderildi (varsa)" });
+
+    // Rate-limit (1 dk arayla)
+    const keyLimit = `reset:limit:${email}`;
+    if (await redis.exists(keyLimit))
+      return res.status(429).json({ success: false, message: "Lütfen biraz sonra tekrar deneyin." });
+
+    const code = crypto.randomInt(100000, 999999).toString();
+    const hash = await bcrypt.hash(code, 10);
+
+    // Hash ve süreyi Redis’e yaz
+    const key = `reset:code:${email}`;
+    await redis.setEx(key, RESET_CODE_TTL_SEC, hash);
+    await redis.setEx(keyLimit, 60, "1"); // rate-limit anahtarı
+
+    // E-posta gönder
+    const html =  `
+  <!DOCTYPE html>
+  <html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Şifre Sıfırlama Kodu</title>
+    <style>
+      body {
+        background-color: #f6f6f6;
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #6a11cb, #2575fc);
+        color: #fff;
+        text-align: center;
+        padding: 24px;
+      }
+      .body {
+        text-align: center;
+        padding: 32px 20px;
+      }
+      .body h2 {
+        color: #2575fc;
+        margin-bottom: 20px;
+        font-size: 22px;
+      }
+      .code-box {
+        display: inline-block;
+        padding: 18px 32px;
+        background: #f8f9ff;
+        border: 3px dashed #2575fc;
+        border-radius: 10px;
+        font-size: 28px;
+        font-weight: bold;
+        letter-spacing: 10px;
+        color: #2575fc;
+        margin: 25px 0;
+      }
+      .footer {
+        background: #f1f1f1;
+        text-align: center;
+        padding: 15px;
+        font-size: 12px;
+        color: #888;
+      }
+      .footer a {
+        color: #2575fc;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Şifre Sıfırlama Talebi</h1>
+      </div>
+      <div class="body">
+        <h2>Şifre sıfırlama kodunuz</h2>
+        <div class="code-box">${code}</div>
+        <p>Bu kod <strong>2 dakika</strong> boyunca geçerlidir.</p>
+      </div>
+      <div class="footer">
+        <p>Bu e-posta otomatik olarak gönderilmiştir.<br/>
+        Sorularınız için <a href="mailto:usda.mecit@gmail.com">usda.mecit@gmail.com</a> adresine ulaşabilirsiniz.</p>
+      </div>
+    </div>
+  </body>
+  </html>
+`;
+    await sendMail(email, { subject: "Şifre Sıfırlama Kodu", html });
+
+    return res.json({ success: true, message: "Kod gönderildi" });
   } catch (err) {
-    console.error("Me error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
 
+router.post("/verify-reset-code", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ success: false, message: "Eksik bilgi" });
+
+    const key = `reset:code:${email}`;
+    const hash = await redis.get(key);
+    if (!hash) return res.status(400).json({ success: false, message: "Kodun süresi dolmuş" });
+
+    const ok = await bcrypt.compare(code, hash);
+    if (!ok) return res.status(400).json({ success: false, message: "Kod hatalı" });
+
+    // Tek kullanımlık token
+    const jti = crypto.randomUUID();
+    const token = jwt.sign({ email, jti, action: "password_reset" }, JWT_SECRET, {
+      expiresIn: RESET_JWT_TTL,
+    });
+
+    // Redis'e "doğrulandı" durumu kaydı (tek kullanımlık)
+    await redis.setEx(`reset:token:${email}`, 300, jti);
+    await redis.del(key); // kod artık silinir
+
+    return res.json({ success: true, token });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Sunucu hatası" });
+  }
+});
+
+
+router.post("/change-password-email", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword)
+      return res.status(400).json({ success: false, message: "Eksik bilgi" });
+
+    if (newPassword.length < 6)
+      return res
+        .status(400)
+        .json({ success: false, message: "Şifre en az 6 karakter olmalı" });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token geçersiz veya süresi dolmuş" });
+    }
+
+    if (payload.action !== "password_reset")
+      return res
+        .status(401)
+        .json({ success: false, message: "Geçersiz işlem" });
+
+    const redisJti = await redis.get(`reset:token:${payload.email}`);
+    if (!redisJti || redisJti !== payload.jti)
+      return res.status(401).json({
+        success: false,
+        message: "Token zaten kullanılmış veya geçersiz",
+      });
+
+    const user = await User.findOne({ email: payload.email });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
+
+    // 🔒 Eski şifreyle aynı mı kontrol et
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      user.password_hash
+    );
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Yeni şifre eski şifreyle aynı olamaz",
+      });
+    }
+
+    // Yeni şifreyi hashle ve kaydet
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    // Token iptal (replay engeli)
+    await redis.del(`reset:token:${payload.email}`);
+
+    return res.json({
+      success: true,
+      message: "Şifre başarıyla değiştirildi",
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası" });
+  }
+});
+
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email)
+      return res.status(400).json({ success: false, message: "E-posta gerekli" });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "Bu e-posta ile kayıtlı kullanıcı yok" });
+
+    if (user.emailVerified)
+      return res.json({ success: false, message: "E-posta zaten doğrulanmış" });
+
+    // Yeni kod üret
+    const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Eski kodu geçersiz kıl
+    await redis.del(`verify:${email}`);
+
+    // Yeni kodu 2 dakika boyunca geçerli olacak şekilde sakla
+    await redis.set(`verify:${email}`, verifyCode, "EX", RESET_JWT_TTL);
+
+    // Token (isteğe bağlı)
+    const token = jwt.sign(
+      { email, code: verifyCode, action: "email_verify" },
+      JWT_SECRET,
+      { expiresIn: "2m" }
+    );
+
+    // Mail gönder
+    const subject = "📧 Yeni E-Posta Doğrulama Kodunuz";
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding:20px; background:#f9f9f9;">
+        <h2 style="color:#333;">E-posta Doğrulama Kodunuz</h2>
+        <p>Merhaba ${user.username},</p>
+        <p>Yeni doğrulama kodunuz aşağıdadır:</p>
+        <div style="font-size:22px; font-weight:bold; color:#ff5f6d; letter-spacing:6px;">${verifyCode}</div>
+        <p>Bu kod 2 dakika boyunca geçerlidir.</p>
+        <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+      </div>
+    `;
+
+    await sendEmail(user.email, subject, html);
+
+    return res.json({
+      success: true,
+      message: "Yeni doğrulama kodu gönderildi",
+      token,
+    });
+  } catch (err) {
+    console.error("resend-verification error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası oluştu" });
+  }
+});
 
 router.post("/verify-email", async (req, res) => {
   try {
     const { email, code } = req.body;
+    if (!email || !code)
+      return res
+        .status(400)
+        .json({ success: false, message: "E-posta ve kod gereklidir" });
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
 
-    // 📌 Kod kontrolü
-    if (user.verifyCode !== code || user.verifyCodeExpires < Date.now()) {
-      return res.status(400).json({ success: false, message: "Kod geçersiz veya süresi dolmuş" });
-    }
+    if (user.emailVerified)
+      return res.json({ success: false, message: "E-posta zaten doğrulanmış" });
 
-    // ✅ Başarılı
+    // Redis'teki kodu çek
+    const storedCode = await redis.get(`verify:${email}`);
+    if (!storedCode)
+      return res
+        .status(401)
+        .json({ success: false, message: "Kodun süresi dolmuş veya geçersiz" });
+
+    if (storedCode !== code)
+      return res
+        .status(400)
+        .json({ success: false, message: "Kod hatalı" });
+
+    // Başarılıysa:
     user.emailVerified = true;
-    user.verifyCode = null;
-    user.verifyCodeExpires = null;
     await user.save();
 
-    res.json({ success: true, message: "E-posta başarıyla doğrulandı" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+    // Kodu iptal et (replay engeli)
+    await redis.del(`verify:${email}`);
 
-
-router.patch("/profile", /*auth,*/ async (req, res) => {
-  try {
-    const { user_id, username, about, avatar } = req.body;
-    if (!user_id) {
-      return res.status(400).json({ success: false, message: "user_id gerekli" });
-    }
-
-    const payload = {};
-    if (typeof username === "string") payload.username = username.trim();
-    if (typeof about === "string") payload.about = about.trim();
-
-    if (typeof avatar === "string") {
-      payload.avatar = {
-        key: avatar.trim(),
-        url: "",            // sıfırla → ilk kullanımda yeni presigned üretilecek
-        url_expiresAt: null
-      };
-    }
-
-    if (!Object.keys(payload).length) {
-      return res.status(400).json({ success: false, message: "Güncellenecek alan yok" });
-    }
-
-    // Güncelle
-    let updated = await User.findByIdAndUpdate(
-      user_id,
-      { $set: payload, $currentDate: { updated_at: true } },
-      { new: true, projection: { password_hash: 0, __v: 0 } }
+    // Yeni JWT (isteğe bağlı)
+    const token = jwt.sign(
+      { userId: user._id, action: "email_verified" },
+      JWT_SECRET,
+      { expiresIn: "15m" }
     );
 
-    if (!updated) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    // ✅ Avatar güncel URL üret (eğer key varsa)
-    if (updated.avatar?.key) {
-      const url = await updated.getAvatarUrl();
-      updated.avatar.url = url;
-    }
-    console.log("data: ",updated)
-    res.json({ success: true, user: updated.toObject() });
-  } catch (err) {
-    console.error("profile patch error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-
-router.put("/settings",async (req,res) => {
-  const {theme, notifications, chatBgImage, chatBgColor, userId} = req.body;
-  try{
-    const user = await User.findByIdAndUpdate(userId,{
-     $set: {
-      "settings.chatBgImage": chatBgImage,
-      "settings.chatBgColor": chatBgColor,
-      "settings.notifications":notifications,
-      "settings.theme":theme
-    }
-  },{new:true});
-  
-  if(!user){
-    return res.json({error:"Ayarlar güncellenemedi."});
-  }
-
-  res.json({
-    success:true,
-    user:{_id: user._id , settings: user.settings}
-  })
-
-  }catch(err){
-    console.log("/settings API Error!")
-    res.json({error:err.message})
-  }
-
-})
-
-router.put("/friends", async (req, res) => {
-  try {
-    const { userId, friendId } = req.body;
-
-    // Eksik parametre kontrolü
-    if (!userId || !friendId) {
-      return res.status(400).json({ message: "userId ve friendId gerekli ❗" });
-    }
-
-    // Kullanıcıları bul
-    const user = await User.findById(userId);
-    const friend = await User.findById(friendId);
-
-    if (!user || !friend) {
-      return res.status(404).json({ message: "Kullanıcı bulunamadı ❌" });
-    }
-
-    // Zaten arkadaş mı?
-    if (user.friends.includes(friendId)) {
-      return res.status(400).json({ message: "Zaten arkadaşsınız 🤝" });
-    }
-
-    // Arkadaş ekleme (karşılıklı)
-    user.friends.push(friendId);
-    friend.friends.push(userId);
-
-    await user.save();
-    await friend.save();
-
-    return res.status(200).json({ message: "Arkadaş eklendi ✔️" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Sunucu hatası ⚠️" });
-  }
-});
-
-router.get("/:id/friends", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: "Geçersiz kullanıcı id" });
-    }
-
-    // Kullanıcıyı bul + arkadaşlarını populate et
-    const user = await User.findById(id)
-      .populate("friends", "_id username status about avatar.url")
-      .lean();
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    // Arkadaş listesini döndür
     return res.json({
       success: true,
-      friends: user.friends || []
+      message: "E-posta başarıyla doğrulandı",
+      token,
     });
   } catch (err) {
-    console.error("GET /user/:id/friends", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-}); 
-
-router.get("/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
-
-    const calls = await Call.find({ participants: userId })
-      .populate("caller_id", "username avatar")
-      .populate("participants", "username avatar")
-      .sort({ started_at: -1 });
-
-    return res.json({ success: true, calls });
-  } catch (err) {
-    console.error("getUserCalls error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-})
-
-router.get("/:userId", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId).select("username email avatar last_seen");
-
-    if (!user) return res.status(404).json({ message: "Kullanıcı bulunamadı" });
-
-    const avatar = await user.getAvatarUrl();
-    if(avatar){
-      user.avatar=avatar
-    }
-    res.json(user);
-  } catch (err) {
-    console.log("error: ",err.message)
-    res.status(500).json({ message: "Sunucu hatası", error: err.message });
-  }
-})
-
-router.post("/friends/request", async (req, res) => {
-  try {
-    const { fromUserId, phone } = req.body;
-
-    const fromUser = await User.findById(fromUserId);
-    const toUser = await User.findOne({ phone });
-
-    if (!toUser) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    if (String(fromUser._id) === String(toUser._id)) {
-      return res.status(400).json({ success: false, message: "Kendi kendine istek gönderemezsin 🚫" });
-    }
-
-    if (fromUser.friends.includes(toUser._id)) {
-      return res.json({ success: false, message: "Zaten arkadaşsınız 🤝" });
-    }
-
-    // 🎯 Karşı taraf zaten bana istek göndermiş mi?
-    if (fromUser.friend_requests.includes(toUser._id)) {
-      // ✅ Her iki taraftan da istekleri kaldır
-      fromUser.friend_requests = fromUser.friend_requests.filter(
-        (id) => String(id) !== String(toUser._id)
-      );
-      toUser.friend_requests = toUser.friend_requests.filter(
-        (id) => String(id) !== String(fromUser._id)
-      );
-
-      // karşılıklı arkadaş olarak ekle
-      fromUser.friends.push(toUser._id);
-      toUser.friends.push(fromUser._id);
-
-      await fromUser.save();
-      await toUser.save();
-
-      return res.json({
-        success: true,
-        autoAccepted: true,
-        message: "Karşılıklı istek vardı, otomatik arkadaş oldunuz 🤝",
-        toUserId: toUser._id,
-        fromUser: fromUser
-      });
-    }
-
-    // Daha önce aynı istek var mı?
-    if (toUser.friend_requests.includes(fromUserId)) {
-      return res.json({ success: false, message: "Zaten istek göndermişsiniz 📩" });
-    }
-
-    // ✅ Normal istek gönderme
-    toUser.friend_requests.push(fromUserId);
-    await toUser.save();
-
-    return res.json({
-      success: true,
-      message: "Arkadaşlık isteği gönderildi ✅",
-      toUserId: toUser._id,
-      fromUser: fromUser
-    });
-  } catch (err) {
-    console.error("Arkadaşlık isteği hatası:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
+    console.error("verify-email error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası oluştu" });
   }
 });
-
-
-
-
-// GET /api/friends/requests/:userId
-router.get("/friends/requests/:userId", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId)
-      .populate("friend_requests", "username avatar status about phone");
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    // 🔥 Avatarları güncelle
-    const requests = [];
-    for (const u of user.friend_requests) {
-      const avatar = await u.getAvatarUrl();
-      if (avatar) u.avatar = avatar;
-      requests.push(u);
-    }
-
-    res.json({ success: true, requests });
-  } catch (err) {
-    console.error("GET /friends/requests error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-// PATCH /api/friends/accept
-router.patch("/friends/accept", async (req, res) => {
-  try {
-    const { userId, fromUserId } = req.body;
-
-    const user = await User.findById(userId);
-    const fromUser = await User.findById(fromUserId);
-
-    if (!user || !fromUser) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    // request sil
-    user.friend_requests = user.friend_requests.filter(id => String(id) !== String(fromUserId));
-
-    // arkadaş listesine ekle
-    if (!user.friends.includes(fromUserId)) user.friends.push(fromUserId);
-    if (!fromUser.friends.includes(userId)) fromUser.friends.push(userId);
-
-    await user.save();
-    await fromUser.save();
-
-    res.json({ success: true, message: "Arkadaşlık isteği kabul edildi", user:user});
-  } catch (err) {
-    console.error("PATCH /friends/accept error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-// PATCH /api/friends/reject
-router.patch("/friends/reject", async (req, res) => {
-  try {
-    const { userId, fromUserId } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-   
-    // request listeden çıkar
-    user.friend_requests = user.friend_requests.filter(id => String(id) !== String(fromUserId));
-    await user.save();
-    res.json({ success: true, message: "Arkadaşlık isteği reddedildi",toUsername:user.username});
-  } catch (err) {
-    console.error("PATCH /friends/reject error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-router.get("/friends/:userId", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId)
-      .populate("friends", "username avatar status about phone");
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
-    // 🔥 Avatarları güncelle
-    const friends = [];
-    for (const f of user.friends) {
-      const avatar = await f.getAvatarUrl();
-      if (avatar) f.avatar = avatar;
-      friends.push(f);
-    }
-    console.log("friends: ",friends)
-
-    res.json({ success: true, friends });
-  } catch (err) {
-    console.error("GET /friends error:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-router.patch("/friends/remove", async (req, res) => {
-  try {
-    const { userId, friendId } = req.body;
-
-    if (!userId || !friendId) {
-      return res.status(400).json({ success: false, message: "userId ve friendId gerekli ❗" });
-    }
-
-    if (String(userId) === String(friendId)) {
-      return res.status(400).json({ success: false, message: "Kendini silemezsin 🚫" });
-    }
-
-    const user = await User.findById(userId);
-    const friend = await User.findById(friendId);
-
-    if (!user || !friend) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı ❌" });
-    }
-
-    // Arkadaş listesinden çıkar
-    user.friends = user.friends.filter((id) => String(id) !== String(friendId));
-    friend.friends = friend.friends.filter((id) => String(id) !== String(userId));
-
-    await user.save();
-    await friend.save();
-
-    return res.json({ success: true, message: "Arkadaş silindi ✔️", friendId });
-  } catch (err) {
-    console.error("Arkadaş silme hatası:", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-});
-
-
 
 
 export default router;

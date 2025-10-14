@@ -12,26 +12,26 @@ const { Types: { ObjectId } } = mongoose;
 
 // GET
 
-router.get("/last-seen",async (req,res) => {
-  try{
-    const format = String(req.query.format || "iso").toLowerCase(); // "iso" | "ms"
-    const users = await User.find({});
-    const userMap = {};
-    for (const d of users) {
-      const t = d.last_seen ? new Date(d.last_seen) : null;
-      userMap[String(d._id)] =
-        t && !isNaN(t.getTime())
-          ? format === "ms"
-            ? t.getTime() // number (epoch ms)
-            : t.toISOString() // string
-          : null; // hiç last_seen yoksa
-    }
-    res.json({ success: true, count: userMap.length, lastSeen: userMap });
-  }catch(err){
-     console.error("GET /users/last-seen error:", err.message);
-    res.status(500).json({ success: false, error: "Sunucu hatası: " +err.message });
-  }
-});
+// router.get("/last-seen",async (req,res) => {
+//   try{
+//     const format = String(req.query.format || "iso").toLowerCase(); // "iso" | "ms"
+//     const users = await User.find({});
+//     const userMap = {};
+//     for (const d of users) {
+//       const t = d.last_seen ? new Date(d.last_seen) : null;
+//       userMap[String(d._id)] =
+//         t && !isNaN(t.getTime())
+//           ? format === "ms"
+//             ? t.getTime() // number (epoch ms)
+//             : t.toISOString() // string
+//           : null; // hiç last_seen yoksa
+//     }
+//     res.json({ success: true, count: userMap.length, lastSeen: userMap });
+//   }catch(err){
+//      console.error("GET /users/last-seen error:", err.message);
+//     res.status(500).json({ success: false, error: "Sunucu hatası: " +err.message });
+//   }
+// });
 
 router.get("/messages/:conversationId", async (req, res) => {
   try {
@@ -144,11 +144,6 @@ router.get("/conversation/:id", async (req,res) => {
   }
 })
 
-
-// Kullanıcının sohbetlerini listeleme
-
-
-
 router.get("/:id/members", async (req, res) => {
   try {
     const { id } = req.params;
@@ -175,8 +170,6 @@ router.get("/:id/members", async (req, res) => {
   }
 });
 
-
-
 router.get("/:userId", async (req, res) => {
   try {
     const me = new mongoose.Types.ObjectId(req.params.userId);
@@ -199,7 +192,7 @@ router.get("/:userId", async (req, res) => {
         if (updated) conv.avatar = updated;
       }
 
-      // ✅ Members avatar
+      //  Members avatar
       for (const member of conv.members) {
         if (member.user?.getAvatarUrl) {
           const updated = await member.user.getAvatarUrl();
@@ -207,7 +200,7 @@ router.get("/:userId", async (req, res) => {
         }
       }
 
-      // ✅ Last message sender avatar
+      //  Last message sender avatar
       if (conv.last_message?.sender?.getAvatarUrl) {
         const updated = await conv.last_message.sender.getAvatarUrl();
         if (updated) conv.last_message.sender.avatar = updated;
@@ -240,151 +233,9 @@ router.get("/:userId", async (req, res) => {
   }
 });
 
-router.post("/join", async (req, res) => {
-  try {
-    const { conversationId, callerId, callType } = req.body;
-
-    // 1️⃣ Konuşmayı bul
-    const conv = await Conversation.findById(conversationId);
-    if (!conv) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Conversation not found" });
-    }
-
-    // 2️⃣ Eğer aktif call varsa → katılımcı güncelle veya ekle
-    if (conv.active_call) {
-      const activeCall = await Call.findById(conv.active_call);
-      if (activeCall && !activeCall.ended_at) {
-        const participantIndex = activeCall.participants.findIndex(
-          (p) => String(p.user) === String(callerId)
-        );
-
-        if (participantIndex >= 0) {
-          // 🔁 Kullanıcı daha önce katılmış ama çıkmış → left_at sıfırla
-          activeCall.participants[participantIndex].left_at = null;
-          activeCall.participants[participantIndex].joined_at = new Date();
-        } else {
-          // ➕ Yeni kullanıcıyı ekle
-          activeCall.participants.push({
-            user: callerId,
-            direction: "incoming",
-            joined_at: new Date(),
-          });
-        }
-
-        await activeCall.save();
-        return res.json({ success: true, call: activeCall });
-      }
-    }
-
-    // 3️⃣ Yeni call oluştur (aktif call yoksa)
-    const newCall = await Call.create({
-      conversation_id: conversationId,
-      caller_id: callerId,
-      participants: [
-        {
-          user: callerId,
-          direction: "outgoing",
-          joined_at: new Date(),
-        },
-      ],
-      call_type: callType || "video",
-      status: "ongoing",
-    });
-
-    // 4️⃣ Conversation’a bağla
-    conv.active_call = newCall._id;
-    await conv.save();
-
-    return res.json({ success: true, call: newCall });
-  } catch (err) {
-    console.error("joinCall error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error: " + err.message });
-  }
-});
-
-
-
-
-// routes/callRoutes.js
-router.post("/leave", async (req, res) => {
-  try {
-    const { callId, userId } = req.body;
-    console.log("leave: ", { callId, userId });
-
-    const call = await Call.findById(callId);
-    if (!call) {
-      return res.status(404).json({ success: false, message: "Call not found" });
-    }
-
-    // 1️⃣ Katılımcının left_at alanını güncelle
-    const participant = call.participants.find(
-      (p) => String(p.user) === String(userId)
-    );
-
-    if (participant) {
-      // yalnızca zaten aktifse (left_at boşsa) güncelle
-      if (!participant.left_at) {
-        participant.left_at = new Date();
-      }
-    } else {
-      // 🔸 varsa ama kaydı yoksa (örneğin sistem hatası) ekle
-      call.participants.push({
-        user: userId,
-        direction: "incoming",
-        joined_at: new Date(),
-        left_at: new Date(),
-      });
-    }
-
-    await call.save();
-
-    // 2️⃣ Aktif (henüz left_at olmayan) kullanıcı var mı?
-    const activeUsers = call.participants.filter((p) => !p.left_at);
-
-    if (activeUsers.length === 0) {
-      // Son kişi çıktı → call’u kapat
-      call.ended_at = new Date();
-      call.duration = Math.max(
-        0,
-        Math.round((call.ended_at - call.started_at) / 1000)
-      );
-
-      // Sadece arayan varsa → missed, değilse ended
-      const joinedUsers = call.participants.filter(
-        (p) => String(p.user) !== String(call.caller_id)
-      );
-      call.status = joinedUsers.length === 0 ? "missed" : "ended";
-
-      await call.save();
-
-      // 3️⃣ Conversation'dan aktif call'u kaldır
-      await Conversation.updateOne(
-        { active_call: callId },
-        { $set: { active_call: null } }
-      );
-    }
-
-    return res.json({ success: true, call });
-  } catch (err) {
-    console.error("leaveCall error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-
-
-
-
 // POST 
 
-// /routes/messages.js
 
-
-// Private chat oluştur veya varsa getir
 router.post("/private", async (req, res) => {
   try {
     const { userId, otherUserId } = req.body;
@@ -420,8 +271,6 @@ router.post("/private", async (req, res) => {
   }
 });
 
-
-// Grup chat oluştur
 router.post("/group", async (req, res) => {
   try {
     const { userId, name, members, avatarKey, createdBy } = req.body;
@@ -527,8 +376,6 @@ router.post("/message", async (req, res) => {
   }
 });
 
-
-
 router.post("/", async (req, res) => {
   try {
     const { type, name, avatar, members } = req.body;
@@ -560,7 +407,7 @@ router.post("/", async (req, res) => {
 });
 
 
-
+// PATCH
 
 router.patch("/:id/avatar", async (req, res) => {
   try {
@@ -612,9 +459,6 @@ router.patch("/:id/avatar", async (req, res) => {
   }
 });
 
-// PATCH
-// router.patch("/conversation/message/mark-sent")
-// routes/message.js
 
 router.patch("/message/mark-delivered", async (req, res) => {
   try {
@@ -675,18 +519,6 @@ router.patch("/message/mark-delivered", async (req, res) => {
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
-
-
-
-
-
-/**
- * Çoklu güncelleme: read/delivered
- * PATCH /api/message/status
- * body: { ids: [..], status: "read" | "delivered", by?: userId }
- */
-// PATCH /api/conversation/message/status
-// Body: { ids: [msgId...], action: "delivered" | "read", by: "<userId>" }
 
 router.patch("/message/status", async (req, res) => {
   try {
@@ -758,16 +590,16 @@ router.patch("/message/status", async (req, res) => {
   }
 });
 
-router.patch('/user/last_seen/:id', async (req,res) => {
-  const {id} = req.params;
-  try{
-    const setLast_Seen = await User.findByIdAndUpdate({_id:id},{$set:{last_seen:Date.now()}})
-    res.json({success:true,last_seen:setLast_Seen.last_seen})
-  }catch(err){
-    console.error("PATCH /user/last_seen/:id", err);
-    res.status(500).json({ error: "Sunucu hatası" });
-  }
-})
+// router.patch('/user/last_seen/:id', async (req,res) => {
+//   const {id} = req.params;
+//   try{
+//     const setLast_Seen = await User.findByIdAndUpdate({_id:id},{$set:{last_seen:Date.now()}})
+//     res.json({success:true,last_seen:setLast_Seen.last_seen})
+//   }catch(err){
+//     console.error("PATCH /user/last_seen/:id", err);
+//     res.status(500).json({ error: "Sunucu hatası" });
+//   }
+// })
 
 router.patch("/:id", async (req, res) => {
   try {
@@ -814,4 +646,5 @@ router.patch("/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
+
 export default router;

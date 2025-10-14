@@ -2,15 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useUser } from "../contextAPI/UserContext";
 import { removeFriend } from "../slices/friendSlice";
 import { useDispatch, useSelector } from "react-redux";
+import { useOutletContext } from "react-router";
 
-export default function FriendsList({
-  socket,
-  onOpenProfile,
-  showNotification,
-}) {
+export default function FriendsList({ socket, onOpenProfile }) {
   const { user } = useUser();
   const [contextMenu, setContextMenu] = useState(null); // { x, y, friendId }
   const { requests, friends } = useSelector((state) => state.friends);
+  const { showNotification } = useOutletContext();
   const dispatch = useDispatch();
   // Sağ tık → menüyü aç
   const handleContextMenu = (e, friendId) => {

@@ -13,13 +13,14 @@ import { useDispatch } from "react-redux";
 import { HiOutlineLogout, HiOutlineDotsVertical } from "react-icons/hi";
 import { MdGroupAdd } from "react-icons/md";
 
-export default function DropdownMenu({ socket, showNotification }) {
+export default function DropdownMenu({ socket }) {
   const [open, setOpen] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false); // 👈 modal state
   const ref = useRef(null);
   const navigate = useNavigate();
   const { clearUser } = useUser();
-  const { setActiveConversation, setactiveConversationId } = useOutletContext();
+  const { setActiveConversation, setactiveConversationId, showNotification } =
+    useOutletContext();
 
   const toggleMenu = () => setOpen(!open);
   const dispatch = useDispatch();

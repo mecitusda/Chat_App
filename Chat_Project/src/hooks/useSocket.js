@@ -27,7 +27,7 @@ export const getPeerIdsFromConversation = (c, meId) => {
     .filter(uid => uid && uid !== my);
 };
 
-export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,friends,dispatch) {
+export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,friends,dispatch,setSpinner) {
   //const dispatch = useDispatch();
   const [status, setStatus] = useState("connecting");
   const { user } = useUser();
@@ -53,27 +53,13 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
         dispatch(addOrUpdateConversations(list));
       }
       console.log("sockettan güncellendi.")
-      const allPeers = new Set();
-  for (const conv of payload.conversations) {
-    if(conv.unread > 0){
-      dispatch(setUnread({ conversationId: conv._id, by: conv.unread }));
-  }
-  // for (const uid of getPeerIdsFromConversation(conv, userId)) {
-  //     allPeers.add(uid);
-  // }
-  }
-  // const ids = Array.from(allPeers);
-  // if (ids.length) {
-  //   socket.emit("presence:subscribe", { userIds: ids });
-  //   socket.emit("presence:who", { userIds: ids }, (map) => {
-  //     // map: { [userId]: { online, lastSeen } }
-  //     dispatch(setPresenceBulk(map));
-  //   });
-  // }
-
-  upsertProfileAvatars(list, userId, dispatch,store.getState);
-
- 
+      for (const conv of payload.conversations) {
+        if(conv.unread > 0){
+          dispatch(setUnread({ conversationId: conv._id, by: conv.unread }));
+        }
+      }
+      upsertProfileAvatars(list, userId, dispatch,store.getState);
+      setSpinner(false)
     };
 
 
@@ -81,6 +67,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
     const last_seen = localStorage.getItem("last_seen");
     const onConnect = () => {
       setStatus("connected");
+      setSpinner(true)
       if (userId) socket.emit("join-chat", {userId,last_seen}); // server chatList’i emit edecek
     };
 

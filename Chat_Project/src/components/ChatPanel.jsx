@@ -23,6 +23,7 @@ import ProfileDrawer from "../components/ProfileDrawer";
 import { useUser } from "../contextAPI/UserContext";
 import { useInView } from "react-intersection-observer";
 import Avatar from "@mui/material/Avatar";
+import { RiCheckDoubleFill } from "react-icons/ri";
 /* ------ Mesaj durum ikonu (aggregate) ------ */
 function getStatusIconByStatus(status) {
   switch (status) {
@@ -31,14 +32,9 @@ function getStatusIconByStatus(status) {
     case "sent":
       return <FiCheck className="icon icon--sent" />;
     case "delivered":
-      return <FaCheckDouble className="icon icon--delivered" />;
+      return <RiCheckDoubleFill className="icon icon--delivered" />;
     case "read":
-      return (
-        <FaCheckDouble
-          className="icon icon--read"
-          style={{ color: "#4fc3f7" }}
-        />
-      );
+      return <RiCheckDoubleFill className="icon icon--read" />;
     default:
       return null;
   }
@@ -46,12 +42,12 @@ function getStatusIconByStatus(status) {
 
 function getSender_Avatar(msg, members) {
   const member = members.filter((m) => m.user._id === msg.sender);
-  return member[0].user.avatar.url;
+  return member[0]?.user?.avatar?.url;
 }
 
 function getSender_Name(msg, members) {
   const member = members.filter((m) => m.user._id === msg.sender);
-  return member[0].user.username;
+  return member[0]?.user?.username;
 }
 
 /* ------ Saat formatı ------ */
@@ -172,6 +168,21 @@ function VisibleMessage({
   isName,
 }) {
   const { ref, inView } = useInView({ threshold: 0.7, triggerOnce: true });
+  const metaRef = useRef(null);
+  const [metaWidth, setMetaWidth] = useState(0);
+  useEffect(() => {
+    if (metaRef.current) {
+      setMetaWidth(metaRef.current.offsetWidth);
+    }
+  }, [msg.text, msg.createdAt, isMe]); // mesaj değişince tekrar ölç
+  useEffect(() => {
+    if (!metaRef.current) return;
+    const observer = new ResizeObserver(() => {
+      setMetaWidth(metaRef.current.offsetWidth);
+    });
+    observer.observe(metaRef.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     if (inView && !isMe && msg?._id) onVisible(msg._id);
   }, [inView, isMe, msg?._id, onVisible]);
@@ -195,8 +206,14 @@ function VisibleMessage({
       )}
       {hasMedia && renderMessageMedia?.(msg)}
       <div className="message__content">
-        {msg.text && <span className="message__text">{msg.text}</span>}
-        <div className="message__meta">
+        {msg.text && (
+          <>
+            <span className="message__text">{msg.text}</span>
+          </>
+        )}
+        <span className="message__spacer" style={{ width: metaWidth }}></span>{" "}
+        {/* boşluk için */}
+        <div className="message__meta" ref={metaRef}>
           <span className="message__time">{formatToHour(msg.createdAt)}</span>
           {isMe && (
             <span className="message__status">
@@ -278,7 +295,7 @@ const ChatPanel = ({
   const [file, setFile] = useState(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState(null);
 
-  const background = user?.settings?.chatBgImage;
+  const background = user?.settings?.chatBgImage || user?.settings?.chatBgColor;
 
   //Search
   const [searchQuery, setSearchQuery] = useState("");

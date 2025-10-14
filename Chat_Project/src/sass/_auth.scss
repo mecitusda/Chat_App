@@ -1,6 +1,6 @@
 /* Kart */
 .auth-container {
-  background: #1c1c1c;
+ background: #0d0d0d;
   color: #fff;
   width: 30%;
   min-width: 400px;
@@ -24,16 +24,15 @@
     margin: 0;
     font-size: clamp(2.4rem, 3vw, 3rem); /* büyütüldü */
     font-weight: 700;
-    color: #ffcc00;
-    text-shadow: 0 0 10px rgba(255, 204, 0, 0.9);
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
   }
 
   p {
     margin: 0.75rem 0 0;
     cursor: pointer;
     font-size: 1.25rem; /* büyütüldü */
-    color: #aaa;
-    &:hover { color: #fff; }
+    color: #ffffff;
   }
 }
 
@@ -52,17 +51,40 @@
     background: #2b2b2b;
     color: #fff;
     outline: none;
-
     &::placeholder {
       font-size: 1.15rem; /* placeholder büyütüldü */
       color: #888;
     }
-
-    &:focus {
-      border: 2px solid #ffcc00;
+    &:focus{
+      border: 1px solid white;
     }
-  }
 
+    
+
+ 
+  }
+  .change_password{
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+      *{
+        text-align: center;
+        justify-content: center;
+      }
+      .resend-btn {
+        background: #fff;
+        color: #000;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: 0.2s ease;
+        &:hover {
+          background: #eee;
+        }
+      }
+    }
   button {
     padding: 1.4rem;
     border: none;
@@ -70,13 +92,13 @@
     font-weight: bold;
     font-size: 1.35rem; /* daha büyük buton yazısı */
     cursor: pointer;
-    background: linear-gradient(45deg, #ffaa00, #ffcc00);
+    background: linear-gradient(45deg, #ffffff, #ffffff);
     color: #000;
     transition: 0.25s ease;
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(255, 204, 0, 0.35);
+      box-shadow: 0 6px 18px rgba(71, 71, 71, 0.35);
     }
 
     &:disabled {
@@ -102,6 +124,7 @@
     outline: none;
     font-size: 1.15rem; /* büyütüldü */
   }
+  
 
   input[type="tel"] {
     flex: 1;
@@ -113,7 +136,7 @@
     outline: none;
     font-size: 1.25rem; /* büyütüldü */
     &::placeholder { color: #888; }
-    &:focus { border: 2px solid #00c4ff; }
+    &:focus { border: 2px solid #ffffff; }
   }
 }
 
@@ -121,10 +144,23 @@
 .auth-switch {
   margin-top: 0.75rem;
   font-size: 1.25rem; /* büyütüldü */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  gap: 2rem;
+  span{
+    text-align: center;
+    &:hover{
+      color: white;
+    }
+  }
   a {
     color: #00c4ff;
     text-decoration: none;
-    &:hover { text-decoration: underline; }
+    &:hover { 
+    text-decoration: underline;
+    color: none!important; }
   }
 }
 

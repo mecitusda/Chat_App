@@ -19,6 +19,7 @@ export default function ProfileSettings({ socket, showNotification }) {
   const [about, setAbout] = useState(user.about || "");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
+
   async function fetchUserAvatar() {
     const now = Date.now();
     if (
@@ -26,7 +27,7 @@ export default function ProfileSettings({ socket, showNotification }) {
       new Date(user.avatar?.url_expiresAt) <= now
     ) {
       const { data } = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/${user?._id}`
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/${user?._id}`
       );
       setUser((prev) => ({
         ...prev,
@@ -67,7 +68,7 @@ export default function ProfileSettings({ socket, showNotification }) {
 
       // 3) backend'e avatar kaydet (sadece key)
       const patchResp = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
         {
           user_id: user._id,
           avatar: media_key, // backend avatar.key olarak kaydedecek
@@ -99,7 +100,7 @@ export default function ProfileSettings({ socket, showNotification }) {
     try {
       setIsUpdating(true);
       const resp = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
         { user_id: user._id, username: name }
       );
       if (resp.data.success && resp.data.user) {
@@ -118,7 +119,7 @@ export default function ProfileSettings({ socket, showNotification }) {
     try {
       setIsUpdating(true);
       const resp = await axios.patch(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
         { user_id: user._id, about }
       );
       if (resp.data.success && resp.data.user) {
