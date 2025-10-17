@@ -704,7 +704,7 @@
       scrollbar-gutter: stable;
       .message {
         position: relative;
-        max-width: 40%;
+        max-width: 80%;
         max-height: 70%;
         padding: .8rem 1rem .5rem 1rem;
         border-radius: 10px 10px 0 10px;
@@ -1446,7 +1446,11 @@
   }
 
 
-
+@media ( (min-width:769px) and (max-width:1400px)){
+  .modal-card{
+    width: 60%!important;
+  }
+}
 
 @media (max-width: 768px) {
  .reset{display: none!important}
@@ -1460,7 +1464,9 @@
   box-sizing: border-box !important;
   
   }
-
+  .modal-card {
+  width: 90%!important;
+}
   /* === ALT MENU === */
   .chat__options {
     

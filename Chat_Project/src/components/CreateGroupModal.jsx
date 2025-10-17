@@ -3,19 +3,21 @@ import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
 import { addOrUpdateConversations } from "../slices/conversationSlice";
+
 export default function CreateGroupModal({
   onClose,
   socket,
   showNotification,
 }) {
-  const friends = useSelector((s) => s.friends.friends || []); // redux friend list
+  const friends = useSelector((s) => s.friends.friends || []);
   const [groupName, setGroupName] = useState("");
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [avatarFile, setAvatarFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false); // 🔥 buton kilidi
   const dispatch = useDispatch();
   const { user } = useUser();
-  // İlk yükleme → listeyi çek
+
   useEffect(() => {
     if (!socket || !user?._id) return;
     socket.emit("friends:list:get", { userId: user._id });
@@ -27,63 +29,62 @@ export default function CreateGroupModal({
     );
   };
 
-  // 📌 Avatar seçme
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setAvatarFile(file);
-      setPreview(URL.createObjectURL(file)); // geçici gösterim
+      setPreview(URL.createObjectURL(file));
     }
   };
 
-  // 📌 Grup oluştur
   const handleSubmit = async () => {
+    if (loading) return; // 🔥 aynı anda iki defa basmayı engelle
     if (!groupName.trim() || selectedFriends.length === 0) {
-      alert("Lütfen grup adı ve en az 1 arkadaş seçin.");
+      showNotification("⚠️ Lütfen grup adı ve en az 1 arkadaş seçin.");
       return;
     }
 
-    let avatarKey = "";
+    setLoading(true); // 🟡 Butonu kilitle
+
     try {
+      let avatarKey = "";
+
       if (avatarFile) {
-        // 1) Presigned URL al
         const { data } = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/group`,
-          {
-            params: { fileType: avatarFile.type },
-          }
+          { params: { fileType: avatarFile.type } }
         );
 
-        const { uploadUrl, key } = data;
-        // 2) Dosyayı yükle
-        await axios.put(uploadUrl, avatarFile, {
+        await axios.put(data.uploadUrl, avatarFile, {
           headers: { "Content-Type": avatarFile.type },
         });
-
-        avatarKey = key;
+        avatarKey = data.key;
       }
 
-      // 3) Socket ile backend’e bildir
       socket.emit(
         "conversation:create-group",
         {
           userId: user._id,
-          name: groupName,
+          name: groupName.trim(),
           members: selectedFriends,
           avatarKey,
           createdBy: user._id,
         },
         (resp) => {
+          setLoading(false); // ✅ Yanıt geldiğinde geri aç
           if (resp.success) {
-            showNotification("🔔Grup başarıyla kuruldu.");
+            showNotification("✅ Grup başarıyla oluşturuldu!");
             dispatch(addOrUpdateConversations(resp.conversation));
+            onClose();
+          } else {
+            showNotification("⚠️ " + (resp.message || "Bir hata oluştu."));
           }
         }
       );
-
-      onClose();
     } catch (err) {
       console.error("Grup oluşturulamadı:", err);
+      showNotification("❌ Sunucu hatası. Tekrar deneyin.");
+      setLoading(false);
     }
   };
 
@@ -92,7 +93,6 @@ export default function CreateGroupModal({
       <div className="modal-card">
         <h2>Yeni Grup</h2>
 
-        {/* Grup Avatarı */}
         <div className="group-avatar-upload">
           <label htmlFor="group-avatar">
             <img
@@ -117,7 +117,6 @@ export default function CreateGroupModal({
           onChange={(e) => setGroupName(e.target.value)}
         />
 
-        {/* Arkadaş seçimi */}
         <div className="friends-list">
           {friends.map((f) => (
             <div
@@ -144,8 +143,12 @@ export default function CreateGroupModal({
         </div>
 
         <div className="modal-actions">
-          <button onClick={handleSubmit}>Oluştur</button>
-          <button onClick={onClose}>Kapat</button>
+          <button onClick={handleSubmit} disabled={loading}>
+            {loading ? "Oluşturuluyor..." : "Oluştur"}
+          </button>
+          <button onClick={onClose} disabled={loading}>
+            Kapat
+          </button>
         </div>
       </div>
     </div>

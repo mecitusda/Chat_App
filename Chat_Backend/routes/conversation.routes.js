@@ -274,7 +274,7 @@ router.post("/private", async (req, res) => {
 router.post("/group", async (req, res) => {
   try {
     const { userId, name, members, avatarKey, createdBy } = req.body;
-
+    
     if (!userId || !name || !Array.isArray(members) || members.length === 0) {
       return res.status(400).json({
         success: false,

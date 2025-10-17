@@ -67,7 +67,7 @@ router.post("/register", async (req, res) => {
 </head>
 <body>
   <div class="container">
-    <div class="header"><h1>Chat Uygulaması</h1></div>
+    <div class="header"><h1>Scriber</h1></div>
     <div class="body">
       <h2>Merhaba {{username}},</h2>
       <p>Hesabını doğrulamak için aşağıdaki <strong>doğrulama kodunu</strong> kullanabilirsin:</p>
