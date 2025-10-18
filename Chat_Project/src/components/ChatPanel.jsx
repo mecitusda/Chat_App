@@ -194,7 +194,9 @@ function VisibleMessage({
       ref={ref}
       className={`message message--${isMe ? "outgoing" : "incoming"} ${
         isCurrentMatch ? "message--highlight" : ""
-      } ${isName && !isMe ? "mb-06" : ""}`}
+      } ${isName && !isMe ? "mb-06" : ""} ${
+        msg.type !== "text" ? "mw-40" : ""
+      }`}
       data-msg-index={index}
     >
       {!isMe && isAvatar && (
@@ -880,7 +882,6 @@ const ChatPanel = ({
 
   useEffect(() => {
     if (!socket) return;
-    console.log(outboxRef);
     const onConnect = () => {
       outboxRef.current.forEach((m) => resendMessage(m));
     };

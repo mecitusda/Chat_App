@@ -22,20 +22,19 @@ export default function HeroSection() {
         <div className="hero-title">
           <h1>
             <span>
-              <img src="/images/logo.png" alt="" />
+              <img src="/images/inner_logo.png" alt="" />
               <span id="logo">criber</span>
             </span>{" "}
-            <span>ile Tanışın</span>
+            <span id="text_logo">ile Tanışın</span>
           </h1>
         </div>
         <p className="hero-subtext">
-          <strong>Scriber</strong>, gerçek zamanlı, güvenli ve hızlı mesajlaşma
-          deneyimi sunmak için
-          <strong> demo</strong> olarak yayınlanmıştır.
-        </p>
-        <p className="hero-subtext">
-          Geri bildirimlerinizle gelişmeye devam ediyoruz. Sorun, öneri ya da
-          görüşlerinizi bizimle{" "}
+          <strong>Scriber</strong>, gerçek zamanlı iletişimi güvenle
+          deneyimlemeniz için geliştirilen yeni nesil bir mesajlaşma
+          platformudur. Her tıklamada hız, her mesajda gizlilik ve her
+          etkileşimde sadelik önceliğimizdir. Bugün yalnızca bir{" "}
+          <strong> demo</strong>, yarın iletişimin yeni standardı. Soru ve
+          önerilerinizi buradan{" "}
           <span className="link" onClick={() => scrollToSection("contact")}>
             paylaşabilirsiniz.
           </span>

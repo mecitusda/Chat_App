@@ -223,6 +223,29 @@ input[class^='btn-']:hover
     }
 }
 
+.mw{
+  &-40{
+    max-width:40%!important;
+  }
+}
+
+@media ( (min-width:769px) and (max-width:1400px)){
+  .mw{
+    &-40{
+      max-width: 45%!important;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+   .mw{
+    &-40{
+      max-width: 50%!important;
+    }
+  }
+}
+
+
 .text-center{
     text-align: center;
 }

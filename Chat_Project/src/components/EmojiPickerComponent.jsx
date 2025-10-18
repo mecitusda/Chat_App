@@ -1,9 +1,15 @@
-"use client";
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
 
-import * as React from "react";
-
-export function EmojiPicker({ onSelect, className }) {
+export function EmojiPicker({ onSelect }) {
   return (
-    <div className={`rounded-lg border shadow-md p-2 ${className || ""}`}></div>
+    <Picker
+      data={data}
+      onEmojiSelect={onSelect}
+      theme="dark"
+      emojiSize={22}
+      emojiButtonSize={34}
+      previewPosition="none"
+    />
   );
 }

@@ -2,16 +2,19 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import BackgroundSetting from "./BackgroundSetting";
 import { useUser } from "../contextAPI/UserContext";
+import data from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
+import { MdOutlineDone } from "react-icons/md";
 
 export default function ProfileSettings({ socket, showNotification }) {
   const fileInputRef = useRef(null);
+  const emojiRefName = useRef(null);
+  const emojiRefAbout = useRef(null);
   const { user, setUser } = useUser();
+
   const [profileImage, setProfileImage] = useState(
     user.avatar?.url || "/images/default-avatar.jpg"
   );
-  if (!user) {
-    return <div>Profil yükleniyor...</div>;
-  }
   const [newFile, setNewFile] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -20,6 +23,31 @@ export default function ProfileSettings({ socket, showNotification }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
 
+  const [showEmojiPickerName, setShowEmojiPickerName] = useState(false);
+  const [showEmojiPickerAbout, setShowEmojiPickerAbout] = useState(false);
+
+  if (!user) return <div>Profil yükleniyor...</div>;
+
+  // ========================
+  // EMOJI PICKER DIŞINA TIKLANINCA KAPAT
+  // ========================
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (emojiRefName.current && !emojiRefName.current.contains(e.target)) {
+        setShowEmojiPickerName(false);
+      }
+      if (emojiRefAbout.current && !emojiRefAbout.current.contains(e.target)) {
+        setShowEmojiPickerAbout(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ========================
+  // AVATAR FETCH & UPDATE
+  // ========================
   async function fetchUserAvatar() {
     const now = Date.now();
     if (
@@ -29,13 +57,11 @@ export default function ProfileSettings({ socket, showNotification }) {
       const { data } = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/${user?._id}`
       );
-      setUser((prev) => ({
-        ...prev,
-        avatar: data.avatar, // { key, url, url_expiresAt }
-      }));
+      setUser((prev) => ({ ...prev, avatar: data.avatar }));
     }
   }
   fetchUserAvatar();
+
   useEffect(() => {
     setProfileImage(user.avatar?.url || "/images/default-avatar.jpg");
   }, [user.avatar]);
@@ -51,8 +77,6 @@ export default function ProfileSettings({ socket, showNotification }) {
     if (!newFile) return;
     try {
       setIsUpdating(true);
-
-      // 1) presigned url al
       const { data } = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/profile`,
         {
@@ -61,41 +85,37 @@ export default function ProfileSettings({ socket, showNotification }) {
       );
       const { uploadURL, media_key } = data;
 
-      // 2) S3'e yükle (PUT)
       await axios.put(uploadURL, newFile, {
         headers: { "Content-Type": newFile.type },
       });
 
-      // 3) backend'e avatar kaydet (sadece key)
       const patchResp = await axios.patch(
         `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
         {
           user_id: user._id,
-          avatar: media_key, // backend avatar.key olarak kaydedecek
+          avatar: media_key,
         }
       );
 
       if (patchResp.data.success) {
         setUser((prev) => ({
           ...prev,
-          avatar: {
-            url: patchResp.data.user.avatar.url,
-            url_expiresAt: patchResp.data.user.avatar.url_expiresAt,
-          }, // { key, url, url_expiresAt }
+          avatar: patchResp.data.user.avatar,
         }));
-
         setProfileImage(patchResp.data.user.avatar.url);
         setNewFile(null);
-        showNotification("🔔Profil fotoğrafı güncellendi.");
+        showNotification("🔔 Profil fotoğrafı güncellendi.");
       }
     } catch (err) {
       console.error("Avatar güncelleme hatası:", err);
-      alert("Avatar güncellenemedi");
     } finally {
       setIsUpdating(false);
     }
   };
 
+  // ========================
+  // AD & HAKKINDA PATCH
+  // ========================
   const handleNameUpdate = async () => {
     try {
       setIsUpdating(true);
@@ -103,13 +123,14 @@ export default function ProfileSettings({ socket, showNotification }) {
         `${import.meta.env.VITE_BACKEND_URL}/api/user/profile`,
         { user_id: user._id, username: name }
       );
+
       if (resp.data.success && resp.data.user) {
         setUser(resp.data.user);
         setIsEditingName(false);
-        showNotification("🔔Kullanıcı adı güncellendi.");
+        showNotification("🔔 Kullanıcı adı güncellendi.");
       }
     } catch (err) {
-      console.error("İsim güncellenemedi:", err);
+      console.error("İsim güncellenemedi:", err.message);
     } finally {
       setIsUpdating(false);
     }
@@ -123,12 +144,9 @@ export default function ProfileSettings({ socket, showNotification }) {
         { user_id: user._id, about }
       );
       if (resp.data.success && resp.data.user) {
-        setUser((prev) => ({
-          ...prev,
-          about: resp.data.user.about,
-        }));
+        setUser((prev) => ({ ...prev, about: resp.data.user.about }));
         setIsEditingAbout(false);
-        showNotification("🔔Hakkında alanı güncellendi.");
+        showNotification("🔔 Hakkında alanı güncellendi.");
       }
     } catch (err) {
       console.error("Hakkımda güncellenemedi:", err);
@@ -136,6 +154,12 @@ export default function ProfileSettings({ socket, showNotification }) {
       setIsUpdating(false);
     }
   };
+
+  // ========================
+  // EMOJI EKLEME (OTOMATİK KAPANMA YOK)
+  // ========================
+  const handleAddEmojiToName = (emoji) => setName((p) => p + emoji.native);
+  const handleAddEmojiToAbout = (emoji) => setAbout((p) => p + emoji.native);
 
   return (
     <div className="settings">
@@ -179,7 +203,7 @@ export default function ProfileSettings({ socket, showNotification }) {
         <div className="profile__field">
           <label>Ad</label>
           {isEditingName ? (
-            <div className="editable__input">
+            <div className="editable__input" ref={emojiRefName}>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -188,11 +212,28 @@ export default function ProfileSettings({ socket, showNotification }) {
               />
               <div className="input__icons">
                 <span className="char-count">{name.length}</span>
-                <span className="emoji-icon">😊</span>
+                <span
+                  className="emoji-btn"
+                  onClick={() => setShowEmojiPickerName((prev) => !prev)}
+                >
+                  😊
+                </span>
                 <span className="check-icon" onClick={handleNameUpdate}>
-                  ✔️
+                  <MdOutlineDone />
                 </span>
               </div>
+              {showEmojiPickerName && (
+                <div className="emoji-popup-settings">
+                  <Picker
+                    data={data}
+                    onEmojiSelect={handleAddEmojiToName}
+                    theme="dark"
+                    emojiSize={22}
+                    emojiButtonSize={34}
+                    previewEmoji="false"
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="editable__display">
@@ -209,7 +250,7 @@ export default function ProfileSettings({ socket, showNotification }) {
         <div className="profile__field">
           <label>Hakkımda</label>
           {isEditingAbout ? (
-            <div className="editable__input">
+            <div className="editable__input" ref={emojiRefAbout}>
               <input
                 value={about}
                 onChange={(e) => setAbout(e.target.value)}
@@ -218,11 +259,28 @@ export default function ProfileSettings({ socket, showNotification }) {
               />
               <div className="input__icons">
                 <span className="char-count">{about.length}</span>
-                <span className="emoji-icon">😊</span>
+                <span
+                  className="emoji-btn"
+                  onClick={() => setShowEmojiPickerAbout((prev) => !prev)}
+                >
+                  😊
+                </span>
                 <span className="check-icon" onClick={handleAboutUpdate}>
-                  ✔️
+                  <MdOutlineDone />
                 </span>
               </div>
+              {showEmojiPickerAbout && (
+                <div className="emoji-popup-settings">
+                  <Picker
+                    data={data}
+                    onEmojiSelect={handleAddEmojiToAbout}
+                    theme="dark"
+                    emojiSize={22}
+                    emojiButtonSize={34}
+                    previewPosition="none"
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="editable__display">
@@ -244,7 +302,7 @@ export default function ProfileSettings({ socket, showNotification }) {
           </div>
         </div>
 
-        {/* ARKA PLAN SEÇİMİ */}
+        {/* ARKA PLAN */}
         <BackgroundSetting showNotification={showNotification} />
       </div>
     </div>

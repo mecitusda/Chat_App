@@ -290,7 +290,7 @@ export default function ChatInput({
               >
                 <EmojiPicker
                   className="h-[326px] rounded-lg border shadow-md"
-                  onSelect={(emoji) => setText((prev) => prev + emoji)}
+                  onSelect={(emoji) => setText((prev) => prev + emoji.native)}
                 />
               </div>
             )}

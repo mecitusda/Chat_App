@@ -524,6 +524,7 @@
             &-status {
               font-size: 1.2rem;
               color: #ccc;
+              white-space: nowrap  
             }
             &-option{
               font-size: 1.4rem;
@@ -658,6 +659,7 @@
           }
           span{
             font-size: 1.2rem;
+            white-space: nowrap;
           }
         }
         .active{
@@ -740,7 +742,7 @@
         &--outgoing {
           display: flex;
           flex-direction: column;
-          background-color:variables.$settings-backend;
+          background-color: variables.$settings-backend;
           color: white;
           align-self: flex-end;
         }
@@ -804,7 +806,10 @@
 
         &__media{
           border-radius: .9rem;
-          max-height: 100%;
+          width: 100%;
+          max-width: 300px;
+          object-fit: cover; 
+          aspect-ratio: 3 / 4; 
         }
       }
       &.no-more{
@@ -918,7 +923,7 @@
   gap: .5rem;
   align-items: stretch;
     .form-control{
-      padding-left: 4rem!important;
+      padding-left: 4.8rem!important;
     }
   
 
@@ -1014,7 +1019,7 @@
     .empty {
       text-align: center;
       padding: 0.75rem;
-      font-size: 0.9rem;
+      font-size: 1.4rem;
       color: variables.$medium-color;
     }
   }
@@ -1213,6 +1218,7 @@
               }
             }
            &__field {
+            position: relative;
             padding: 2rem 3rem;
             width: 100%;
             display: flex;
@@ -1277,7 +1283,8 @@
 
           .check-icon {
             cursor: pointer;
-            color: #0f0;
+            color: variables.$accent;
+            font-size: 2rem;
           }
         }
       }
@@ -1447,12 +1454,18 @@
 
 
 @media ( (min-width:769px) and (max-width:1400px)){
+  .message__media{
+    max-width: 350px!important;
+  }
   .modal-card{
     width: 60%!important;
   }
 }
 
 @media (max-width: 768px) {
+  .message__media{
+    max-width: 450px!important;
+  }
  .reset{display: none!important}
   
  .chat-container {
@@ -1629,6 +1642,7 @@
   }
 
 }
+
 
 
 

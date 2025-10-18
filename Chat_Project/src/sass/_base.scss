@@ -269,18 +269,37 @@ img{
   to { transform: rotate(360deg); }
 }
 
-.emoji-picker, .emoji-popup {
-  font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif !important;
+.emoji-picker, .emoji-popup, .emoji-popup-settings {
+  font-family: "Twemoji Mozilla", "Twemoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;
 }
+
+
 .emoji-popup {
   position: absolute!important;
   bottom: 60px!important;
   left: 20px!important;
-  z-index: 1000!important;
+  z-index: 100000!important;
   background: #1e1e1e!important;
   border: 1px solid #333!important;
   border-radius: 8px!important;
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.emoji-popup-settings {
+  position: absolute!important;
+  top: 8rem!important;
+  right: 0!important;
+  z-index: 10000!important;
+  background: #1e1e1e!important;
+  border: 1px solid #333!important;
+  border-radius: 8px!important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+.emoji-btn{
+  &:hover{
+    cursor: pointer;
+    opacity: 0.8;
+  }
 }
 
 .carousel {

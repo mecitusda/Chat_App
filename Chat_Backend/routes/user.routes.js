@@ -220,10 +220,6 @@ router.put("/friends", async (req, res) => {
   }
 });
 
-// DELETE
-
-
-// PATCH
 
 router.put("/settings",async (req,res) => {
   const {theme, notifications, chatBgImage, chatBgColor, userId} = req.body;
@@ -252,6 +248,11 @@ router.put("/settings",async (req,res) => {
   }
 
 })
+// DELETE
+
+
+// PATCH
+
 
 router.patch("/friends/accept", async (req, res) => {
   try {
@@ -332,6 +333,57 @@ router.patch("/friends/remove", async (req, res) => {
     res.status(500).json({ success: false, message: "Sunucu hatası" });
   }
 });
+
+router.patch("/profile", async (req, res) => {
+  try {
+    const { user_id, username, about, avatar } = req.body;
+
+    if (!user_id)
+      return res
+        .status(400)
+        .json({ success: false, message: "Kullanıcı ID gerekli." });
+
+    const user = await User.findById(user_id);
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı." });
+
+    // 🔹 Kullanıcı adı
+    if (username !== undefined && username.trim()) {
+      user.username = username.trim();
+    }
+
+    // 🔹 Hakkında
+    if (about !== undefined) {
+      user.about = about.trim();
+    }
+
+    // 🔹 Avatar (S3 key geldiyse)
+    if (avatar) {
+      user.avatar.key = avatar;
+      const newUrl = await getSignedUrlFromStorage(avatar);
+      user.avatar.url = newUrl;
+      user.avatar.url_expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 gün geçerli
+    }
+
+    await user.save();
+    const jsonUser = user.toJSON();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profil başarıyla güncellendi.",
+      user: jsonUser,
+    });
+  } catch (err) {
+    console.error("Profil güncelleme hatası:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Profil güncellenirken bir hata oluştu.",
+      error: err.message,
+    });
+  }
+})
 
 
 
