@@ -44,14 +44,20 @@ function formatSimpleTime(iso) {
     .padStart(2, "0")}.${d.getFullYear()}`;
 }
 function highlight(text, q) {
+  // Eğer string değilse (örneğin JSX, sayı, null vs), direkt döndür
+  if (typeof text !== "string") return text;
+
   const t = text ?? "";
   const qq = trimSpaces(q);
   if (!qq) return t;
+
   const i = t.toLowerCase().indexOf(qq.toLowerCase());
   if (i === -1) return t;
+
   const before = t.slice(0, i);
   const match = t.slice(i, i + qq.length);
   const after = t.slice(i + qq.length);
+
   return (
     <>
       {before}
@@ -60,6 +66,7 @@ function highlight(text, q) {
     </>
   );
 }
+
 // ====== alt bileşen: her satır ======
 const ChatListItem = memo(function ChatListItem({
   conversation,
@@ -78,6 +85,7 @@ const ChatListItem = memo(function ChatListItem({
       : conversation.members?.[0]?.user);
   const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar?.url;
   const lastMsg = conversation.last_message;
+  console.log(previewContent);
   return (
     <li className="chat__item" onClick={() => onSelect(conversation._id)}>
       <Avatar

@@ -39,6 +39,9 @@ const Header = ({ scrollTarget }) => {
             <h1>criber</h1>
           </a>
           <ul className="main-nav__items">
+            {/* <li>
+              <a onClick={() => scrollToSection("about")}>Hakkında</a>
+            </li> */}
             <li>
               <a onClick={() => scrollToSection("gallery")}>Galeri</a>
             </li>
@@ -71,6 +74,9 @@ const Header = ({ scrollTarget }) => {
             />
           </a>
           <ul className="sticky-nav__items">
+            {/* <li>
+              <a onClick={() => scrollToSection("about")}>Hakkında</a>
+            </li> */}
             <li>
               <a onClick={() => scrollToSection("gallery")}>Galeri</a>
             </li>
