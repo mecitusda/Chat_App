@@ -85,7 +85,6 @@ const ChatListItem = memo(function ChatListItem({
       : conversation.members?.[0]?.user);
   const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar?.url;
   const lastMsg = conversation.last_message;
-  console.log(previewContent);
   return (
     <li className="chat__item" onClick={() => onSelect(conversation._id)}>
       <Avatar
@@ -185,7 +184,14 @@ export default function ChatList({
     if (conversation.type === "group") {
       const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
       if (!mem) return { who: "", content: "" };
-      who = mem?.user._id !== user?._id ? mem?.user.username : "Sen  ";
+      who = mem?.user._id !== user?._id ? mem?.user.username : "Sen ";
+    } else {
+      const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
+      const other = conversation?.members?.find(
+        (m) => m?.user?._id === senderId
+      );
+      if (!mem) return { who: "", content: "" };
+      who = user?._id === senderId ? "Sen " : other.user.username;
     }
 
     // 🧩 Tip ikonları
@@ -350,6 +356,7 @@ export default function ChatList({
 
   // === Mesaj arama ===
   const filteredMessages = useMemo(() => {
+    if (debounced === "") return;
     const q = trimSpaces(debounced).toLowerCase();
     if (!q) return [];
 

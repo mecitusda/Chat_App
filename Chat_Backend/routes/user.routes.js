@@ -2,6 +2,7 @@ import express from "express";
 const router = express.Router();
 import {authMiddleware } from "../middleware/auth.js"
 import User from "../models/Users.js";
+import mongoose  from "mongoose";
 // GET
 
 router.get("/friends/requests/:userId", async (req, res) => {

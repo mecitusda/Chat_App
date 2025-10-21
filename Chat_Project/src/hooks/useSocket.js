@@ -27,7 +27,7 @@ export const getPeerIdsFromConversation = (c, meId) => {
     .filter(uid => uid && uid !== my);
 };
 
-export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,friends,dispatch,setSpinner) {
+export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversations,friends,dispatch,setSpinner, setProgress) {
   //const dispatch = useDispatch();
   const [status, setStatus] = useState("connecting");
   const { user } = useUser();
@@ -45,8 +45,10 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
 
   useEffect(() => {
     if (!socket) return;
+    setProgress(20)
     // ---- Server events ----
     const onChatList = (payload) => {
+      setProgress(40)
       // payload yapın: { conversations: [...] } ise:
       const list = Array.isArray(payload?.conversations) ? payload.conversations : payload;
       if (Array.isArray(list) && list.length >= 0) {
@@ -54,11 +56,13 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations,conversat
       }
       console.log("sockettan güncellendi.")
       for (const conv of payload.conversations) {
+        const myUnread = conv?.members.find((m) => m.user._id === userId);
         if(conv.unread > 0){
-          dispatch(setUnread({ conversationId: conv._id, by: conv.unread }));
+          dispatch(setUnread({ conversationId: conv._id, by: myUnread.unread }));
         }
       }
       upsertProfileAvatars(list, userId, dispatch,store.getState);
+      setProgress(60)
       setSpinner(false)
     };
 

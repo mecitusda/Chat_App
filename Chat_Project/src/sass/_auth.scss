@@ -113,9 +113,9 @@
 .phone-input {
   display: flex;
   gap: 0.75rem;
-
+  flex-direction: row;
   select {
-    min-width: 150px;
+
     padding: 1.1rem;
     border-radius: 10px;
     border: none;
@@ -128,10 +128,10 @@
 
   input[type="tel"] {
     flex: 1;
-    padding: 1.2rem;
+    padding: 1.2rem 1rem ;
     border-radius: 10px;
     border: none;
-    background: #2b2b2b;
+    background: #2b2b2b!important;
     color: #fff;
     outline: none;
     font-size: 1.25rem; /* büyütüldü */

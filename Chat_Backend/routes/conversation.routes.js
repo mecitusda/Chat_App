@@ -170,29 +170,92 @@ router.get("/:id/members", async (req, res) => {
   }
 });
 
+// router.get("/:userId", async (req, res) => {
+//   try {
+//     const me = new mongoose.Types.ObjectId(req.params.userId);
+
+//     // 1) Document olarak konuşmaları getir
+//     let conversations = await Conversation.find({ "members.user": me })
+//       .sort({ updatedAt: -1 })
+//       .populate("last_message.sender", "username avatar")
+//       .populate("members.user", "username phone avatar status about")
+//       .populate("last_message.message", "")
+//       .populate("createdBy","")
+//       .populate("active_call"," ")
+//       .exec();
+   
+//     // 2) Avatarları güncelle
+//     for (const conv of conversations) {
+//       // ✅ Conversation avatar
+//       if (conv.getAvatarUrl) {
+//         const updated = await conv.getAvatarUrl();
+//         if (updated) conv.avatar = updated;
+//       }
+
+//       //  Members avatar
+//       for (const member of conv.members) {
+//         if (member.user?.getAvatarUrl) {
+//           const updated = await member.user.getAvatarUrl();
+//           if (updated) member.user.avatar = updated;
+//         }
+//       }
+
+//       //  Last message sender avatar
+//       if (conv.last_message?.sender?.getAvatarUrl) {
+//         const updated = await conv.last_message.sender.getAvatarUrl();
+//         if (updated) conv.last_message.sender.avatar = updated;
+//       }
+//     }
+
+//     // 3) JSON objesine çevir
+//     conversations = conversations.map((c) => c.toObject());
+
+//     // 4) Unread hesapla
+//     await Promise.all(
+//       conversations.map(async (c) => {
+//         const meMember = c.members.find(
+//           (m) => String(m.user?._id || m.user) === String(me)
+//         );
+//         const lastReadId = meMember?.lastReadMessageId || null;
+
+//         const query = { conversation: c._id, sender: { $ne: me } };
+//         if (lastReadId) query._id = { $gt: lastReadId };
+
+//         const unread = await Message.countDocuments(query);
+//         c.unread = unread; // artık JSON obje → eklenir
+//       })
+//     );
+
+//     res.json({ success: true, conversations });
+//   } catch (err) {
+//     console.error("GET /conversation/:userId error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// POST 
+
 router.get("/:userId", async (req, res) => {
   try {
     const me = new mongoose.Types.ObjectId(req.params.userId);
 
-    // 1) Document olarak konuşmaları getir
+    // 1️⃣ Konuşmaları getir
     let conversations = await Conversation.find({ "members.user": me })
       .sort({ updatedAt: -1 })
       .populate("last_message.sender", "username avatar")
       .populate("members.user", "username phone avatar status about")
       .populate("last_message.message", "")
-      .populate("createdBy","")
-      .populate("active_call"," ")
+      .populate("createdBy", "")
+      .populate("active_call", "")
       .exec();
-   
-    // 2) Avatarları güncelle
+
+    // 2️⃣ Avatarları yenile (görsellerin URL süresi dolmuşsa)
     for (const conv of conversations) {
-      // ✅ Conversation avatar
       if (conv.getAvatarUrl) {
         const updated = await conv.getAvatarUrl();
         if (updated) conv.avatar = updated;
       }
 
-      //  Members avatar
       for (const member of conv.members) {
         if (member.user?.getAvatarUrl) {
           const updated = await member.user.getAvatarUrl();
@@ -200,40 +263,30 @@ router.get("/:userId", async (req, res) => {
         }
       }
 
-      //  Last message sender avatar
       if (conv.last_message?.sender?.getAvatarUrl) {
         const updated = await conv.last_message.sender.getAvatarUrl();
         if (updated) conv.last_message.sender.avatar = updated;
       }
     }
 
-    // 3) JSON objesine çevir
-    conversations = conversations.map((c) => c.toObject());
+    // 3️⃣ JSON’a dönüştür ve sadece aktif kullanıcıya özel unread değeri ekle
+    const result = conversations.map((conv) => {
+      const c = conv.toObject();
+      const meMember = c.members.find(
+        (m) => String(m.user?._id || m.user) === String(me)
+      );
+      c.myUnread = meMember?.unread ?? 0;
+      return c;
+    });
 
-    // 4) Unread hesapla
-    await Promise.all(
-      conversations.map(async (c) => {
-        const meMember = c.members.find(
-          (m) => String(m.user?._id || m.user) === String(me)
-        );
-        const lastReadId = meMember?.lastReadMessageId || null;
-
-        const query = { conversation: c._id, sender: { $ne: me } };
-        if (lastReadId) query._id = { $gt: lastReadId };
-
-        const unread = await Message.countDocuments(query);
-        c.unread = unread; // artık JSON obje → eklenir
-      })
-    );
-
-    res.json({ success: true, conversations });
+    // 4️⃣ Gönder
+    res.json({ success: true, conversations: result });
   } catch (err) {
     console.error("GET /conversation/:userId error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST 
 
 
 router.post("/private", async (req, res) => {
@@ -328,53 +381,123 @@ router.post("/group", async (req, res) => {
   }
 });
 
-router.post("/message", async (req, res) => {
-  try {
-    let { conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info } = req.body;
-    if (!conversation || !sender) return res.status(400).json({ error: "Eksik alan" });
-    //console.log("data: ",{ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
-    // uyumluluk: eski client "media" yollarsa gerçek türe çevir
+// router.post("/message", async (req, res) => {
+//   try {
+//     let { conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info } = req.body;
+//     if (!conversation || !sender) return res.status(400).json({ error: "Eksik alan" });
+//     //console.log("data: ",{ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
+//     // uyumluluk: eski client "media" yollarsa gerçek türe çevir
     
-    console.log({ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
-    // güvenlik: text vs media boşluk kontrolü
-    if (type === "text" && !text) return res.status(400).json({ error: "Text boş" });
-    if (["image","video","file"].includes(type) && !media_key)
-      return res.status(400).json({ error: "media_key eksik" });
+//     console.log({ conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info })
+//     // güvenlik: text vs media boşluk kontrolü
+//     if (type === "text" && !text) return res.status(400).json({ error: "Text boş" });
+//     if (["image","video","file"].includes(type) && !media_key)
+//       return res.status(400).json({ error: "media_key eksik" });
 
-    const message = await Message.create({
-      conversation, sender, type, text,
-      media_key, mimetype, size, media_duration,
-      call_info,readBy:[{user:sender}],deliveredTo:[{user:sender}]
-    });
+//     const message = await Message.create({
+//       conversation, sender, type, text,
+//       media_key, mimetype, size, media_duration,
+//       call_info,readBy:[{user:sender}],deliveredTo:[{user:sender}]
+//     });
 
-    if(message.media_key){
-      await message.getMediaUrl();
-    }
+//     if(message.media_key){
+//       await message.getMediaUrl();
+//     }
     
-    const chat = await Conversation.findByIdAndUpdate(
-      conversation,
-      {
-        $set: {
-          "last_message.message": message._id,
-          "last_message.type": type,
-          "last_message.sender": sender,
-          updated_at:message.createdAt
-        },
-      },
-      { new: true }
-    ).sort({ updated_at: -1 }).populate({ path: "last_message.sender", select: "username" })
-      .populate("members.user", "username phone avatar status about")
-      .populate("last_message.message","")
-      .populate("createdBy", "username");
+//     const chat = await Conversation.findByIdAndUpdate(
+//       conversation,
+//       {
+//         $set: {
+//           "last_message.message": message._id,
+//           "last_message.type": type,
+//           "last_message.sender": sender,
+//           updated_at:message.createdAt
+//         },
+//       },
+//       { new: true }
+//     ).sort({ updated_at: -1 }).populate({ path: "last_message.sender", select: "username" })
+//       .populate("members.user", "username phone avatar status about")
+//       .populate("last_message.message","")
+//       .populate("createdBy", "username");
       
     
     
-    res.status(201).json({ success: true, message , chat});
+//     res.status(201).json({ success: true, message , chat});
+//   } catch (e) {
+//     console.log("sunucu hatası: ",e.message);
+//     res.status(500).json({ error: "Sunucu hatası" });
+//   }
+// });
+
+router.post("/message", async (req, res) => {
+  try {
+    const { conversation, sender, type, text, media_key, mimetype, size, media_duration, call_info } = req.body;
+
+    if (!conversation || !sender)
+      return res.status(400).json({ error: "Eksik alan" });
+
+    if (type === "text" && !text)
+      return res.status(400).json({ error: "Text boş" });
+
+    if (["image", "video", "file"].includes(type) && !media_key)
+      return res.status(400).json({ error: "media_key eksik" });
+
+    // 📨 Mesaj oluştur
+    const message = await Message.create({
+      conversation,
+      sender,
+      type,
+      text,
+      media_key,
+      mimetype,
+      size,
+      media_duration,
+      call_info,
+      readBy: [{ user: sender }],
+      deliveredTo: [{ user: sender }],
+    });
+
+    // 🎞️ Medya varsa URL oluştur
+    if (message.media_key) await message.getMediaUrl();
+
+    // 🕓 Son mesajı güncelle
+    await Conversation.updateOne(
+      { _id: conversation },
+      {
+        $set: {
+          "last_message.message": message._id,
+          "last_message.text": text || "",
+          "last_message.type": type,
+          "last_message.sender": sender,
+          "last_message.sent_at": new Date(),
+          updated_at: message.createdAt,
+        },
+      }
+    );
+
+    // ⚡️ unread’i artır (gönderen hariç)
+    await Conversation.updateOne(
+      { _id: conversation },
+      { $inc: { "members.$[elem].unread": 1 } },
+      {
+        arrayFilters: [{ "elem.user": { $ne: sender } }],
+      }
+    );
+
+    // 🔄 Güncel hali al
+    const updatedChat = await Conversation.findById(conversation)
+      .populate("last_message.sender", "username avatar")
+      .populate("members.user", "username phone avatar status about")
+      .populate("last_message.message", "")
+      .populate("createdBy", "username");
+
+    res.status(201).json({ success: true, message, chat: updatedChat });
   } catch (e) {
-    console.log("sunucu hatası: ",e.message);
+    console.error("sunucu hatası:", e.message);
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
+
 
 router.post("/", async (req, res) => {
   try {
@@ -523,6 +646,7 @@ router.patch("/message/mark-delivered", async (req, res) => {
 router.patch("/message/status", async (req, res) => {
   try {
     const { ids = [], action, by, convId } = req.body;
+
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: "ids boş olamaz" });
     }
@@ -533,12 +657,13 @@ router.patch("/message/status", async (req, res) => {
 
     const now = new Date();
 
+    // ✅ 1️⃣ Teslim Edildi
     if (action === "delivered") {
-      // deliveredTo'ya yoksa ekle (idempotent)
       const r = await Message.updateMany(
         { _id: { $in: ids }, "deliveredTo.user": { $ne: by } },
         { $push: { deliveredTo: { user: by, at: now } } }
       );
+
       return res.json({
         success: true,
         action,
@@ -547,8 +672,9 @@ router.patch("/message/status", async (req, res) => {
       });
     }
 
+    // ✅ 2️⃣ Okundu (read)
     if (action === "read") {
-      // readBy'ya yoksa ekle, deliveredTo'yu da garanti et
+      // readBy ve deliveredTo listelerine ekle
       const result = await Message.bulkWrite([
         {
           updateMany: {
@@ -564,23 +690,28 @@ router.patch("/message/status", async (req, res) => {
         },
       ]);
 
-      const lastMessage = await Message.findOne({ _id: { $in: ids } })
-  .sort({ _id: -1 }); // ObjectId sırasına göre en yeni
-      await Conversation.updateOne(
-  { _id: convId, "members.user": by },
-  {
-    $set: {
-      "members.$.lastReadMessageId": lastMessage._id,
-      "members.$.lastReadAt": now
-    }
-  }
-);
+      // En son okunan mesajı bul
+      const lastMessage = await Message.findOne({ _id: { $in: ids } }).sort({
+        _id: -1,
+      });
 
-      // kaba bir modified hesabı (yeterli)
+      // ✅ Kullanıcının lastReadMessageId ve unread bilgilerini güncelle
+      await Conversation.updateOne(
+        { _id: convId, "members.user": by },
+        {
+          $set: {
+            "members.$.lastReadMessageId": lastMessage?._id || null,
+            "members.$.lastReadAt": now,
+            "members.$.unread": 0, // 🔥 unread sıfırla
+          },
+        }
+      );
+
+      // (Opsiyonel) İstersen diğer üyelerin unread'lerini koru
+
+      // kaba bir modified hesabı
       const modified =
-        (result?.result?.nModified ??
-          result?.modifiedCount ??
-          0);
+        (result?.result?.nModified ?? result?.modifiedCount ?? 0);
 
       return res.json({ success: true, action, by, modified });
     }
@@ -589,6 +720,7 @@ router.patch("/message/status", async (req, res) => {
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
+
 
 // router.patch('/user/last_seen/:id', async (req,res) => {
 //   const {id} = req.params;

@@ -187,8 +187,10 @@ io.on("connection", (socket) => {
 
     const { data: rq } = await axios.get(`${BACKEND_URL}/api/user/friends/requests/${userId}`);
     socket.emit("friends:requests:list", { success: true, requests: rq.requests || [] });
-
-    console.log(`${userId} joined, chat list + delivered patch sent.`);
+    const { data: friends } = await axios.get(`${BACKEND_URL}/api/user/${userId}/friends`);
+    socket.emit("friends:list",{
+      success:true,friends:friends.friends
+    })
   } catch (err) {
     console.error("join error:", err?.response?.data || err?.message);
     socket.emit("error", "Chat listesi alınamadı");
@@ -370,6 +372,7 @@ io.on("connection", (socket) => {
     const url = `${BACKEND_URL}/api/conversation/messages/${conversationId}?before=${before}&limit=${limit || 50}`;
     const {data} = await axios.get(url);
     socket.emit("messageList", {conversationId,...data,message:"before"}); // tek event
+    socket.emit("messages-before-result",{conversationId:conversationId})
   } catch (err) {
     console.error("messages-before error:", err?.message);
     socket.emit("error", "Eski mesajlar alınamadı");

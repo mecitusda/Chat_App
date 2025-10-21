@@ -7,25 +7,27 @@ import {
   removeFriend,
   addRequest,
   removeRequest,
-  autoAccept,
+  autoAccept
 } from "../slices/friendSlice";
 import { useUser } from "../contextAPI/UserContext";
 
-export function useFriends({socket, showNotification}) {
+export function useFriends({socket, showNotification,   setProgress}) {
   const { user } = useUser();
   const dispatch = useDispatch();
   const { requests, friends } = useSelector((state) => state.friends);
   //console.log("friends: ",friends, "requests: ",requests)
   useEffect(() => {
     if (!socket || !user?._id) return;
-
+    setProgress(40)
     // ✅ Arkadaş listesi
     socket.on("friends:list", (payload) => {
+      setProgress(100)
       if (payload.success) dispatch(setFriends(payload.friends));
     });
 
     // ✅ Gelen istekler
     socket.on("friends:requests:list", (payload) => {
+      setProgress(80)
       if (payload.success) dispatch(setRequests(payload.requests));
     });
 

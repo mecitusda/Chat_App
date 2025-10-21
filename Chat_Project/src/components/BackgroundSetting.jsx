@@ -3,6 +3,7 @@ import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
 import { MdClose } from "react-icons/md";
 import LazyImage from "./LazyImage";
+
 const backgrounds = [
   "bg1.webp",
   "bg2.webp",
@@ -26,75 +27,15 @@ export default function BackgroundSetting({ showNotification }) {
   const { user, setUser } = useUser();
   const currentImageUrl = user?.settings?.chatBgImage || "";
   const currentColor = user?.settings?.chatBgColor || "#000000";
+
   const [showList, setShowList] = useState(false);
   const [loading, setLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const observerRef = useRef();
 
-  const handleSelect = async (bgFilename) => {
-    try {
-      setLoading(true);
-      const fullImageUrl = `/backgrounds/${bgFilename}`;
-      const res = await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/user/settings`,
-        {
-          userId: user._id,
-          chatBgImage: fullImageUrl,
-          chatBgColor: null,
-        },
-        { withCredentials: true }
-      );
-
-      if (res.data.success) {
-        setUser((prev) => ({
-          ...prev,
-          settings: {
-            ...prev.settings,
-            chatBgImage: fullImageUrl,
-            chatBgColor: null,
-          },
-        }));
-        setShowList(false);
-        showNotification("🔔 Arka plan güncellendi.");
-      }
-    } catch (err) {
-      console.error("Arka plan güncellenemedi:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleColorChange = async (e) => {
-    const color = e.target.value;
-    try {
-      setLoading(true);
-      const res = await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/user/settings`,
-        {
-          userId: user._id,
-          chatBgColor: color,
-          chatBgImage: null,
-        },
-        { withCredentials: true }
-      );
-
-      if (res.data.success) {
-        setUser((prev) => ({
-          ...prev,
-          settings: {
-            ...prev.settings,
-            chatBgColor: color,
-            chatBgImage: null,
-          },
-        }));
-        setShowList(false);
-      }
-    } catch (err) {
-      console.error("Renk güncellenemedi:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ✅ geçici seçimler (önizleme)
+  const [tempBg, setTempBg] = useState(currentImageUrl);
+  const [tempColor, setTempColor] = useState(currentColor);
 
   const lastThumbRef = useCallback(
     (node) => {
@@ -112,56 +53,121 @@ export default function BackgroundSetting({ showNotification }) {
     [loading, visibleCount]
   );
 
+  // ✅ sadece seçimi değiştir (henüz kaydetme)
+  const handleSelectImage = (bgFilename) => {
+    const fullImageUrl = `/backgrounds/${bgFilename}`;
+    setTempBg(fullImageUrl);
+    setTempColor(null);
+  };
+
+  const handleColorChange = (e) => {
+    const color = e.target.value;
+    setTempColor(color);
+    setTempBg(null);
+  };
+
+  // ✅ kaydet (tek endpoint)
+  const handleApply = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/user/settings`,
+        {
+          userId: user._id,
+          chatBgImage: tempBg,
+          chatBgColor: tempBg ? null : tempColor,
+        },
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        setUser((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            chatBgImage: tempBg,
+            chatBgColor: tempBg ? null : tempColor,
+          },
+        }));
+        showNotification("🎨 Arka plan güncellendi.");
+        setShowList(false);
+      }
+    } catch (err) {
+      console.error("Arka plan kaydedilemedi:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-setting">
       <h3>Arka Plan Ayarı</h3>
+
+      {/* ✅ önizleme */}
       <div
         className="bg-preview"
         onClick={() => setShowList(true)}
         style={{
-          backgroundImage: currentImageUrl ? `url(${currentImageUrl})` : "none",
-          backgroundColor: !currentImageUrl ? currentColor : "transparent",
+          backgroundImage: tempBg ? `url(${tempBg})` : "none",
+          backgroundColor: !tempBg ? tempColor : "transparent",
         }}
         title="Arka planı değiştirmek için tıklayın"
       />
+
+      {/* ✅ modal */}
       {showList && (
         <div className="bg-overlay">
           <div className="bg-modal">
             <MdClose
               className="bg-close-btn"
-              onClick={() => setShowList(false)}
+              onClick={() => {
+                setShowList(false);
+                setTempBg(currentImageUrl);
+                setTempColor(currentColor);
+              }}
             />
             <h4>Arka Plan Seç</h4>
+
             <div className="bg-thumb-list">
               {backgrounds.slice(0, visibleCount).map((bg, index) => {
                 const isLast = index === visibleCount - 1;
                 const thumbPath = `/backgrounds/thumbs/${bg}`;
                 const fullPath = `/backgrounds/${bg}`;
+                const isSelected = tempBg === fullPath; // ✅ seçili kontrolü
                 return (
                   <LazyImage
                     key={bg}
                     thumbSrc={thumbPath}
                     fullSrc={fullPath}
                     alt={bg}
-                    onClick={() => handleSelect(bg)}
+                    onClick={() => handleSelectImage(bg)}
                     observe={isLast ? lastThumbRef : null}
+                    className={`bg-thumb-img ${isSelected ? "selected" : ""}`}
                   />
                 );
               })}
             </div>
+
             <div className="bg-color-picker">
               <label>🎨 Renk:</label>
               <input
                 type="color"
-                value={currentColor}
+                value={tempColor || "#000000"}
                 onChange={handleColorChange}
                 disabled={loading}
               />
             </div>
+
+            <button
+              onClick={handleApply}
+              disabled={loading}
+              className="bg-apply-btn"
+            >
+              {loading ? "Kaydediliyor..." : "Uygula"}
+            </button>
           </div>
         </div>
       )}
-      {loading && <p>Güncelleniyor...</p>}
     </div>
   );
 }

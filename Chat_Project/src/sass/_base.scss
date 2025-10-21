@@ -231,43 +231,73 @@ img{
   }
 
 
-  .chat__loading-overlay {
+.chat__loading-overlay {
   position: absolute;
   inset: 0;
   z-index: 30;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-
-  // arka planı biraz geçirgen yapıp mesajlar gözüksün:
-  background: rgba(0,0,0,0.18);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-
-  // overlay scroll’u engellesin:
+  align-items: flex-start;
+  background: none;
   pointer-events: auto;
+  padding-top: 4rem;
+  // Görsel geçiş
+  opacity: 0.8;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+
+  &.fade-out {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .chat__loading-box {
+    background: #1f1f1f;
+    padding: 1rem 1.6rem;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: row;
+    gap:1rem;
+    align-items: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: slideDownFade 0.4s ease forwards;
+  }
+
+  .chat__spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
 
   .chat__loading-text {
-    margin-top: .6rem;
-    font-size: 14px;
+    font-size: 13px;
     color: #fff;
-    opacity: .9;
+    opacity: 0.95;
   }
 }
 
-.chat__spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid rgba(255,255,255,0.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 
 .emoji-picker, .emoji-popup, .emoji-popup-settings {
   font-family: "Twemoji Mozilla", "Twemoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif !important;

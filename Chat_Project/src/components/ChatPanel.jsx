@@ -152,9 +152,29 @@ function getHeaderAvatarKey(conversation, selfId) {
   }
   return conversation?.avatar.url; // group media_key
 }
-/* ------------------------------------------------------------------ */
-/* 1) Per-message alt component: Hook'lar burada!                      */
-/* ------------------------------------------------------------------ */
+
+function formatDateDivider(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const isToday = d.toDateString() === today.toDateString();
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  if (isToday) return "Bugün";
+  if (isYesterday) return "Dün";
+
+  // Türkçe tarih biçimi (örneğin: 21 Ekim 2025)
+  return d.toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function VisibleMessage({
   msg,
   index,
@@ -251,6 +271,7 @@ const ChatPanel = ({
   const dispatch = useDispatch();
   let beforeMessage = null;
   const listRef = useRef(null);
+
   const hasMoreOlder = useSelector((s) =>
     convId ? selectHasMore(s, convId) : true
   );
@@ -262,6 +283,7 @@ const ChatPanel = ({
   const prevScrollHeightRef = useRef(0);
   const prevScrollTopRef = useRef(0);
   const pendingBeforeIdRef = useRef(null);
+  const scrollLockRef = useRef(false);
 
   const touchStartYRef = useRef(0);
   const hasTriggeredPullRef = useRef(false);
@@ -270,7 +292,8 @@ const ChatPanel = ({
     (s) => s.messages?.byConversation[activeConversation?._id] || []
   );
   const canLoadOlder = !!isOnline && !!hasMoreOlder;
-
+  const loaderTimeoutRef = useRef(null);
+  const loaderMinVisibleUntil = useRef(0);
   const outboxRef = useRef(new Map()); // tempId -> message
   //console.log("mesajlar:", convMessages);
   /* read throttle/guard */
@@ -287,7 +310,7 @@ const ChatPanel = ({
 
   //Skip
   const endRef = useRef(null);
-  const wasAtBottomRef = useRef(true);
+  const wasAtBottomRef = useRef(false);
   const isPrependingRef = useRef(false);
 
   //Profile
@@ -303,6 +326,16 @@ const ChatPanel = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]); // array of message indices
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+
+  const startLoadingOlder = () => {
+    if (loaderTimeoutRef.current) clearTimeout(loaderTimeoutRef.current);
+
+    // Loader’ı hemen aç
+    setLoadingOlder(true);
+
+    // Minimum görünürlük süresi.Şuan 0
+    loaderMinVisibleUntil.current = Date.now();
+  };
 
   useEffect(() => {
     if (!socket || !convId) return;
@@ -342,16 +375,24 @@ const ChatPanel = ({
     const firstId = oldestId || convMessages?.[0]?._id;
     if (!firstId) return;
 
-    setLoadingOlder(true);
-    pendingBeforeIdRef.current = firstId;
+    // 🔒 kilitle
+    isPrependingRef.current = true;
+    scrollLockRef.current = true;
 
+    // 🔥 Loader’ı hemen göster
+    startLoadingOlder();
+
+    // scroll state’i koru
     prevScrollHeightRef.current = el.scrollHeight;
     prevScrollTopRef.current = el.scrollTop;
-    isPrependingRef.current = true;
+    pendingBeforeIdRef.current = firstId;
+
+    // ⏱️ 2 saniye bekle sonra mesajları iste
+    //console.log("📩 Backend'den eski mesajlar isteniyor...");
     socket?.emit("messages-before", {
       conversationId: convId,
       before: firstId,
-      limit: 20,
+      limit: 5,
     });
   }, [
     convId,
@@ -402,32 +443,48 @@ const ChatPanel = ({
   }, [socket, dispatch, convId]);
 
   /* messages-before dönüşünde pozisyonu koru */
+
   useEffect(() => {
-    if (!loadingOlder) return;
-    const el = listRef.current;
-    if (!el) return;
+    if (!socket || !convId) return;
 
-    const requestedBeforeId = pendingBeforeIdRef.current;
-    const newFirstId = convMessages?.[0]?._id;
+    const handleMessagesBefore = (payload) => {
+      if (payload.conversationId !== convId) return;
 
-    if (requestedBeforeId && newFirstId && newFirstId !== requestedBeforeId) {
-      const prevH = prevScrollHeightRef.current;
-      const prevT = prevScrollTopRef.current;
-      const newH = el.scrollHeight;
-      el.scrollTop = newH - prevH + prevT;
-    }
-    setLoadingOlder(false);
-    pendingBeforeIdRef.current = null;
-    isPrependingRef.current = false;
-  }, [convMessages, loadingOlder]);
-  /* Scroll: hem eski mesaj yükle, hem alttaysa okundu yap + atBottom'ı Redux'a yaz */
+      //console.log("📩 Backend eski mesajları gönderdi:");
+      const el = listRef.current;
+      if (el) {
+        const prevH = prevScrollHeightRef.current;
+        const prevT = prevScrollTopRef.current;
+        const newH = el.scrollHeight;
+        el.scrollTop = newH - prevH + prevT;
+      }
+
+      // 🕒 Minimum 2 saniye garantisi
+      const remaining = loaderMinVisibleUntil.current - Date.now();
+      const done = () => {
+        clearTimeout(loaderTimeoutRef.current);
+        setLoadingOlder(false);
+        isPrependingRef.current = false;
+        scrollLockRef.current = false;
+      };
+
+      if (remaining > 0) {
+        loaderTimeoutRef.current = setTimeout(done, remaining);
+      } else {
+        done();
+      }
+    };
+
+    socket.on("messages-before-result", handleMessagesBefore);
+    return () => socket.off("messages-before-result", handleMessagesBefore);
+  }, [socket, convId]);
 
   const updateAtBottom = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
     const at = isNearBottom(el, 40);
     setIsAtBottom(at);
-    wasAtBottomRef.current = at; // kritik
+    wasAtBottomRef.current = at;
     if (convId) dispatch(setAtBottom({ conversationId: convId, atBottom: at }));
   }, [convId, dispatch]);
 
@@ -450,27 +507,31 @@ const ChatPanel = ({
     (e) => {
       const el = listRef.current;
       if (!el || loadingOlder || hasTriggeredPullRef.current) return;
-      if (el.scrollTop > 0) return;
 
-      const currentY = e.touches?.[0]?.clientY ?? 0;
-      const delta = currentY - touchStartYRef.current;
-      if (delta > 60) {
-        hasTriggeredPullRef.current = true;
-        loadOlder();
+      // Eğer en üstteyse — scroll hareketini tamamen iptal et
+      if (el.scrollTop <= 0) {
+        e.preventDefault(); // yukarı kaymayı fiziksel olarak engeller
+        if (hasMoreOlder && !isPrependingRef.current) {
+          loadOlder();
+          hasTriggeredPullRef.current = true;
+        }
       }
     },
-    [loadOlder, loadingOlder]
+    [loadOlder, loadingOlder, hasMoreOlder]
   );
   const handleScroll = useCallback(() => {
     const el = listRef.current;
     if (!el || loadingOlder) return;
 
-    if (el.scrollTop <= 100) loadOlder();
+    // Eğer kullanıcı yukarı kaydırmaya çalıştıysa:
+    if (el.scrollTop <= 0 && hasMoreOlder && !isPrependingRef.current) {
+      // Scroll'u sabitle
+      el.scrollTop = 1; // yukarı kaymayı engeller (0'a inmez)
+      loadOlder(); // eski mesajları yükle
+    }
 
     updateAtBottom();
-    //  if (wasAtBottomRef.current) markAsRead();
-  }, [loadOlder, loadingOlder, updateAtBottom]); //markAsRead
-
+  }, [loadOlder, loadingOlder, hasMoreOlder, updateAtBottom]);
   //konuşma değişti
   useEffect(() => {
     if (listRef.current) {
@@ -520,49 +581,36 @@ const ChatPanel = ({
     }
   }, [convId]);
 
-  /* Yeni mesaj geldiğinde: alttaysa en alta yapışık kal + Redux'a atBottom yaz + okundu gönder */
   useEffect(() => {
-    //console.log("yeni mesaj geldi en alttayım.");
     const el = listRef.current;
     if (!el || convMessages.length === 0) return;
-    if (isPrependingRef.current) {
-      updateAtBottom(); // sadece state/ref güncelle
-      return;
-    }
+
+    // Eski mesaj yüklenirken hiçbir şey yapma
+    if (scrollLockRef.current || isPrependingRef.current) return;
+
+    // KARAR: Önceki frame’de altta mıydık?
+    const wasAtBottomBeforeUpdate = wasAtBottomRef.current;
+
+    // Son mesajı ben mi gönderdim?
     const last = convMessages[convMessages.length - 1];
     const iSent = String(last?.sender?._id || last?.sender) === String(userId);
-    // karar: DOM öncesi hesaplanan ref + ben gönderdiysem
-    const shouldStick = wasAtBottomRef.current || iSent;
 
-    if (shouldStick) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const box = listRef.current;
-          if (!box) return;
-          box.scrollTop = box.scrollHeight;
-          setIsAtBottom(true);
-          wasAtBottomRef.current = true;
-          if (convId)
-            dispatch(setAtBottom({ conversationId: convId, atBottom: true }));
-        });
-      });
-    } else {
-      // alt değilse, state/ref’i güncelle
-      updateAtBottom();
-    }
-  }, [convMessages.length, convId, dispatch, userId, updateAtBottom]);
+    // DOM boyaması bitsin, sonra uygula
+    requestAnimationFrame(() => {
+      if (wasAtBottomBeforeUpdate || iSent) {
+        // Alttaysak (VEYA ben gönderdiysem) otomatik en alta in
+        el.scrollTop = el.scrollHeight;
+        setIsAtBottom(true);
+        wasAtBottomRef.current = true;
+      } else {
+        // Yukarıdaysak dokunma; sadece state’i güncelle
+        const nowAtBottom = isNearBottom(el, 40);
+        setIsAtBottom(nowAtBottom);
+        wasAtBottomRef.current = nowAtBottom;
+      }
+    });
+  }, [convMessages.length, userId]);
 
-  /* Fokus dönüşünde alttaysa okundu yap */
-  // useEffect(() => {
-  //   const onFocus = () => {
-  //     const el = listRef.current;
-  //     if (el && isNearBottom(el)) markAsRead();
-  //   };
-  //   window.addEventListener("focus", onFocus);
-  //   return () => window.removeEventListener("focus", onFocus);
-  // }, [markAsRead]);
-
-  /* ------ Yazıyor metni ------ */
   const typingText = React.useMemo(() => {
     const ids = (activeTypers || []).filter((id) => id !== userId);
     if (ids.length === 0) return "";
@@ -736,13 +784,12 @@ const ChatPanel = ({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     setTimeout(() => {
-      wasAtBottomRef.current = true;
       setIsAtBottom(true);
+      wasAtBottomRef.current = true;
       if (convId)
         dispatch(setAtBottom({ conversationId: convId, atBottom: true }));
-      //markAsRead();
     }, 200);
-  }, [convId, dispatch]); //markAsRead
+  }, [convId, dispatch]);
 
   useEffect(() => setProfileOpen(false), [activeConversation?._id]);
 
@@ -890,7 +937,7 @@ const ChatPanel = ({
     // (socket.io kullanıyorsan reconnect de aynı şekilde connect tetiklenir.)
     return () => socket.off("connect", onConnect);
   }, [socket, resendMessage]);
-
+  let prevDate = null;
   return (
     <div className={`chat__panel ${activeConversation ? "is-visible" : ""}`}>
       {activeConversation && (
@@ -982,19 +1029,64 @@ const ChatPanel = ({
             )}
             {loadingOlder && (
               <div
-                className="chat__loading-overlay"
-                onWheel={(e) => e.preventDefault()}
-                onTouchMove={(e) => e.preventDefault()}
-                onScroll={(e) => e.preventDefault()}
-                aria-hidden="true"
+                className={`chat__loading-overlay ${
+                  !loadingOlder ? "fade-out" : ""
+                }`}
               >
-                <div className="chat__spinner" />
-                <div className="chat__loading-text">Mesajlar yükleniyor…</div>
+                <div className="chat__loading-box">
+                  <div className="chat__spinner" />
+                  <div className="chat__loading-text">Mesajlar yükleniyor…</div>
+                </div>
               </div>
             )}
           </>
         )}
+
         {convMessages.map((msg, index) => {
+          const isMe = (msg?.sender?._id || msg?.sender) === userId;
+          const isMatch = searchResults.includes(index);
+          const isCurrentMatch =
+            isMatch && searchResults[currentSearchIndex] === index;
+          let isAvatar;
+          let isName;
+          if (convMessages[index + 1]?.sender !== msg.sender) {
+            isName = true;
+          }
+          if (beforeMessage !== msg.sender) {
+            beforeMessage = msg.sender;
+            isAvatar = true;
+          }
+
+          // === Gün değişti mi kontrol et ===
+          const msgDate = new Date(msg.createdAt).toDateString();
+          const showDateDivider = msgDate !== prevDate;
+          prevDate = msgDate;
+
+          return (
+            <React.Fragment key={msg._id || `i-${index}`}>
+              {showDateDivider && (
+                <div className="date-divider">
+                  <span>{formatDateDivider(msg.createdAt)}</span>
+                </div>
+              )}
+              <VisibleMessage
+                msg={msg}
+                index={index}
+                isMe={isMe}
+                onVisible={queueRead}
+                renderMessageMedia={renderMessageMedia}
+                computeStatus={(m) =>
+                  computeEffectiveStatus(m, activeConversation, userId)
+                }
+                isCurrentMatch={isCurrentMatch}
+                conversation={activeConversation}
+                isAvatar={isAvatar}
+                isName={isName}
+              />
+            </React.Fragment>
+          );
+        })}
+        {/* {convMessages.map((msg, index) => {
           const isMe = (msg?.sender?._id || msg?.sender) === userId;
           const isMatch = searchResults.includes(index);
           const isCurrentMatch =
@@ -1025,8 +1117,7 @@ const ChatPanel = ({
               isName={isName}
             />
           );
-        })}
-
+        })} */}
         <div ref={endRef} />
         {!isAtBottom && unread > 0 && (
           <div className="chat__scrollToBottom">

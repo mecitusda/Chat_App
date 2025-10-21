@@ -242,6 +242,7 @@
       },
       setUnread(state, action) {
         const { conversationId, by = 1 } = action.payload;
+        console.log("by: ",by)
         const c = current(state).list.findIndex(x => String(x._id) === String(conversationId));
         if (c !== -1) state.list[c].unread = by
       },

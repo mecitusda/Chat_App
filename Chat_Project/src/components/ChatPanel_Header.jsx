@@ -43,22 +43,45 @@ function formatLastSeen(ts) {
   if (!ts) return "Çevrimdışı";
 
   let d;
-  if (typeof ts === "number") {
-    d = new Date(ts);
-  } else if (typeof ts === "string") {
-    d = new Date(ts); // ISO string de parse edilir
-  } else if (ts instanceof Date) {
-    d = ts;
-  } else {
-    return "Çevrimdışı";
-  }
+  if (typeof ts === "number") d = new Date(ts);
+  else if (typeof ts === "string") d = new Date(ts);
+  else if (ts instanceof Date) d = ts;
+  else return "Çevrimdışı";
 
   if (isNaN(d.getTime())) return "Çevrimdışı";
 
-  return `son görülme ${d.toLocaleTimeString("tr-TR", {
+  const now = new Date();
+
+  const isSameDay =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = d.toLocaleTimeString("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
-  })}`;
+  });
+
+  if (isSameDay) {
+    return `son görülme bugün ${timeStr}`;
+  } else if (isYesterday) {
+    return `son görülme dün ${timeStr}`;
+  } else {
+    const dateStr = d.toLocaleDateString("tr-TR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    return `son görülme ${dateStr} ${timeStr}`;
+  }
 }
 
 function getActiveParticipantsCount(conversation) {

@@ -15,7 +15,7 @@ import {
 // Conversations
 import {
   addOrUpdateConversations,
-  incrementUnread,
+  setUnread,
 } from "../slices/conversationSlice";
 import { MdGroup, MdPerson } from "react-icons/md";
 // Messages
@@ -34,6 +34,7 @@ import { useUser } from "../contextAPI/UserContext";
 import IncomingCallModal from "../components/IncomingCallModal";
 import OutgoingCallModal from "../components/OutgoingCallModal";
 import { setParticipants, userJoined, userLeft } from "../slices/callSlice";
+import AppLoader from "../components/AppLoader";
 
 const playNotificationSound = () => {
   const audio = new Audio("/sounds/new-notification.mp3");
@@ -54,6 +55,16 @@ const Chat = () => {
   const { user, setUser } = useUser();
   const userId = user?._id;
   //console.log("user: ", user);
+  const [progress, setProgress] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (progress === 100) {
+      setTimeout(() => {
+        setReady(true);
+      }, 600);
+    }
+  }, [progress]);
 
   const dispatch = useDispatch();
   // Global state
@@ -65,6 +76,7 @@ const Chat = () => {
   const { requests, friends } = useSelector((state) => state.friends);
   const [spinner, setSpinner] = useState(false);
 
+  //console.log(requests, friends);
   //console.log("pres: ", pres);
   //console.log("arkadaşlar: ", friends);
   //console.log("chatler: ", conversations);
@@ -85,10 +97,11 @@ const Chat = () => {
     conversations,
     friends,
     dispatch,
-    setSpinner
+    setSpinner,
+    setProgress
   );
 
-  useFriends({ socket, showNotification }); // socket listener’ları Redux’a bağlar
+  useFriends({ socket, showNotification, setProgress }); // socket listener’ları Redux’a bağlar
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -278,7 +291,7 @@ const Chat = () => {
       // Sunucu 'status' gönderiyor ("delivered" | "read")
       const ids = messageId ? [messageId] : messageIds || [];
       if (ids.length === 0) return;
-      console.log("mesaj değişmeli: ", ids);
+      //console.log("mesaj değişmeli: ", ids);
       dispatch(
         applyMessageAck({
           conversationId: conversationId || activeConversation?._id, // yoksa aktif sohbete yaz
@@ -329,7 +342,7 @@ const Chat = () => {
     if (existing.length === 0 && !activeConversation._id.startsWith("_temp")) {
       // İlk kez açılıyor → en yeni mesajları çek
 
-      socket.emit("messages", { conversationId: convId, limit: 20 });
+      socket.emit("messages", { conversationId: convId, limit: 5 });
       // after guard’ını sıfırla
       lastAfterSentRef.current[convId] = null;
     } else {
@@ -344,7 +357,7 @@ const Chat = () => {
         socket.emit("messages-after", {
           conversationId: convId,
           after: lastId,
-          limit: 20,
+          limit: 5,
         });
 
         lastAfterSentRef.current[convId] = lastId;
@@ -362,31 +375,14 @@ const Chat = () => {
       const panelAtBottom = isActiveConv ? activeAtBottom : false;
       const isTabVisible = document.visibilityState === "visible";
       const isFromOther = r.data?.last_message?.sender?._id !== userId;
-      console.log(
-        "isavtive: ,",
-        isActiveConv,
-        "panel bottom:",
-        panelAtBottom,
-        "istabvisible:",
-        isTabVisible,
-        "isFrom other"
-      );
+      const myUnread = r.data?.members.find((m) => m.user._id === userId);
       dispatch(addOrUpdateConversations([r.data]));
-      console.log("dönen chat", r.data);
       if (
         isFromOther &&
         (!isActiveConv || !panelAtBottom || !isTabVisible) &&
         r.data.last_message?.message?._id !== undefined
       ) {
-        const increment = r.data?.last_message?.sender._id !== userId ? 1 : 0;
-        if (increment === 1) {
-          dispatch(
-            incrementUnread({
-              conversationId: convId,
-              by: 1,
-            })
-          );
-        }
+        dispatch(setUnread({ conversationId: convId, by: myUnread.unread }));
       }
       console.log("yeni mesaj geldi");
       console.log("karşı taraftan mı mesaj: ", isFromOther);
@@ -522,6 +518,8 @@ const Chat = () => {
     setActivePage("profileSettings");
     setactiveConversationId(null);
   };
+
+  if (!ready) return <AppLoader progress={progress} />;
   return (
     <>
       <title>Chat</title>
