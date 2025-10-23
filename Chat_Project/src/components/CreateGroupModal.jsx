@@ -2,7 +2,10 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import { useUser } from "../contextAPI/UserContext";
-import { addOrUpdateConversations } from "../slices/conversationSlice";
+import {
+  addOrUpdateConversations,
+  setUnread,
+} from "../slices/conversationSlice";
 
 export default function CreateGroupModal({
   onClose,
@@ -32,10 +35,24 @@ export default function CreateGroupModal({
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Önce eski preview varsa temizle
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
       setAvatarFile(file);
-      setPreview(URL.createObjectURL(file));
+      const newUrl = URL.createObjectURL(file);
+      setPreview(newUrl);
     }
   };
+
+  // 🧹 component unmount olduğunda da temizle
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   const handleSubmit = async () => {
     if (loading) return; // 🔥 aynı anda iki defa basmayı engelle
@@ -75,6 +92,15 @@ export default function CreateGroupModal({
           if (resp.success) {
             showNotification("✅ Grup başarıyla oluşturuldu!");
             dispatch(addOrUpdateConversations(resp.conversation));
+            const by = resp.conversation.members.find(
+              (m) => m.user._id === user._id
+            );
+            dispatch(
+              setUnread({
+                conversationId: resp.conversation._id,
+                by: by.unread,
+              })
+            );
             onClose();
           } else {
             showNotification("⚠️ " + (resp.message || "Bir hata oluştu."));

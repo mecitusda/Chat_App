@@ -13,7 +13,7 @@ import callReducer from "../slices/callSlice"
 const rootPersistConfig = {
   key: "root",
   storage,
-  whitelist: ["files", "messages", "conversations","paginations","presenceSlices","uiSlices","notifications","friends","calls"], // keep small indexes/metadata in LS
+  whitelist: ["files", "messages", "conversations","paginations","presences","uiSlices","notifications","friends","calls"], // keep small indexes/metadata in LS
 };
 
 const rootReducer = combineReducers({

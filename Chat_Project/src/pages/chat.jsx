@@ -35,15 +35,15 @@ import IncomingCallModal from "../components/IncomingCallModal";
 import OutgoingCallModal from "../components/OutgoingCallModal";
 import { setParticipants, userJoined, userLeft } from "../slices/callSlice";
 import AppLoader from "../components/AppLoader";
-
-const playNotificationSound = () => {
-  const audio = new Audio("/sounds/new-notification.mp3");
-  audio.play().catch((error) => {
-    console.warn("🔇 Ses çalınamadı:", error);
-  });
-};
+import { shallowEqual } from "react-redux";
+import { store } from "../store";
+import { useMemo } from "react";
+import { useCallback } from "react";
+import useMemoryMonitor from "../hooks/useMemoryMonitor";
 
 const Chat = () => {
+  useMemoryMonitor(5000); // 5 saniyede bir ölçüm
+  const activeConvRef = useRef(null);
   const {
     activeConversation,
     setActiveConversation,
@@ -52,6 +52,15 @@ const Chat = () => {
     activeConversationId,
     setactiveConversationId,
   } = useOutletContext();
+
+  const playNotificationSound = useCallback(() => {
+    const audio = new Audio("/sounds/new-notification.mp3");
+    audio.play().catch((error) => console.warn("🔇 Ses çalınamadı:", error));
+  }, []);
+
+  useEffect(() => {
+    activeConvRef.current = activeConversation;
+  }, [activeConversation]);
   const { user, setUser } = useUser();
   const userId = user?._id;
   //console.log("user: ", user);
@@ -64,15 +73,22 @@ const Chat = () => {
         setReady(true);
       }, 600);
     }
-  }, [progress]);
+  }, [progress, ready]);
 
   const dispatch = useDispatch();
   // Global state
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
-  const conversations = useSelector((s) => s.conversations.list || []);
-  const messagesByConv = useSelector((s) => s.messages?.byConversation || {});
-  const filesByConv = useSelector((s) => s.files?.byKey || {});
+  const conversations = useSelector(
+    (s) => s.conversations.list || [],
+    shallowEqual
+  );
+
+  const messagesByConv = useSelector(
+    (s) => s.messages?.byConversation,
+    shallowEqual
+  );
+  const filesByConv = useSelector((s) => s.files?.byKey, shallowEqual);
   const { requests, friends } = useSelector((state) => state.friends);
   const [spinner, setSpinner] = useState(false);
 
@@ -88,7 +104,7 @@ const Chat = () => {
   const [activePage, setActivePage] = useState("chatList");
   const navigate = useNavigate();
   // Yeni mesaj (after) fetch animasyonu için
-  const [fetchingNew, setFetchingNew] = useState(false);
+  const fetchingNewRef = useRef(false);
   // Socket
   const { socket, status, isConnected } = useSocket(
     SOCKET_URL,
@@ -101,7 +117,7 @@ const Chat = () => {
     setProgress
   );
 
-  useFriends({ socket, showNotification, setProgress }); // socket listener’ları Redux’a bağlar
+  useFriends({ socket, setProgress }); // socket listener’ları Redux’a bağlar
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -113,21 +129,14 @@ const Chat = () => {
   // Aynı lastId için üst üste messages-after emit etmemek için guard
   const lastAfterSentRef = useRef({}); // { [convId]: lastAfterId }
 
-  function getTotalUnreadMessages() {
-    return conversations.reduce((total, chat) => {
-      return total + (chat.unread || 0); // unread değeri yoksa 0 kabul edilir
-    }, 0);
-  }
-
-  if (getTotalUnreadMessages() > 0) {
-    document.title = `(${getTotalUnreadMessages()})Chat`;
-  } else {
-    document.title = "Chat";
-  }
-
-  const activeAtBottom = useSelector((s) =>
-    selectAtBottom(s, activeConversation?._id)
+  const totalUnread = useMemo(
+    () => conversations.reduce((sum, c) => sum + (c.unread || 0), 0),
+    [conversations]
   );
+
+  useEffect(() => {
+    document.title = totalUnread > 0 ? `(${totalUnread})Chat` : "Chat";
+  }, [totalUnread]);
 
   // === Presigned URL yenileme: ayrı effect (filesByConv bağımlı) ===
   useEffect(() => {
@@ -151,7 +160,7 @@ const Chat = () => {
         conversationId: convId,
       });
     }
-  }, [socket, filesByConv, activeConversation?._id, user]);
+  }, [socket, activeConversation?._id]);
 
   // === Socket listeners (tek sefer bağla) ===
   useEffect(() => {
@@ -160,7 +169,7 @@ const Chat = () => {
     const handleMessageList = (newData) => {
       const arr = newData?.messages || [];
       const page = newData?.pageInfo || {};
-      setFetchingNew(false);
+      fetchingNewRef.current = false;
       const convId =
         newData.conversationId ||
         arr[0]?.conversation ||
@@ -224,8 +233,8 @@ const Chat = () => {
           userId,
         });
       });
-      if (getTotalUnreadMessages() > 0) {
-        document.title = `(${getTotalUnreadMessages()})Chat`;
+      if (totalUnread > 0) {
+        document.title = `(${totalUnread})Chat`;
       } else {
         document.title = "Chat";
       }
@@ -247,38 +256,38 @@ const Chat = () => {
       }
     };
 
-    const handleAvatarPreUrls = (data) => {
-      if (!data || typeof data !== "object") return;
-      // backend 3600s veriyorsa küçük bir buffer bırak (5 dk)
-      const NOW = Date.now();
-      const ONE_HOUR = 60 * 60 * 1000;
-      const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dakika buffer
-      const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
+    // const handleAvatarPreUrls = (data) => {
+    //   if (!data || typeof data !== "object") return;
+    //   // backend 3600s veriyorsa küçük bir buffer bırak (5 dk)
+    //   const NOW = Date.now();
+    //   const ONE_HOUR = 60 * 60 * 1000;
+    //   const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dakika buffer
+    //   const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
 
-      for (const [conversationId, items] of Object.entries(data)) {
-        const files = (items || [])
-          .filter(
-            (it) =>
-              it &&
-              it.media_key &&
-              (it.type === "avatar" || it.type === "conversation-avatar")
-          )
-          .map((it) => ({
-            media_key: it.media_key,
-            media_url: it.media_url,
-            type: it.type,
-            ownerUserId: it.ownerUserId,
-            sourceConvId: it.sourceConvId,
-            expiresAt: DEFAULT_EXPIRES_AT,
-          }));
+    //   for (const [conversationId, items] of Object.entries(data)) {
+    //     const files = (items || [])
+    //       .filter(
+    //         (it) =>
+    //           it &&
+    //           it.media_key &&
+    //           (it.type === "avatar" || it.type === "conversation-avatar")
+    //       )
+    //       .map((it) => ({
+    //         media_key: it.media_key,
+    //         media_url: it.media_url,
+    //         type: it.type,
+    //         ownerUserId: it.ownerUserId,
+    //         sourceConvId: it.sourceConvId,
+    //         expiresAt: DEFAULT_EXPIRES_AT,
+    //       }));
 
-        if (files.length > 0) {
-          //console.log("avatar güncellendi.");
-          dispatch(upsertFiles({ conversationId, files }));
-        }
-      }
-    };
-    // 🔧 DÜZELTİLEN KISIM
+    //     if (files.length > 0) {
+    //       //console.log("avatar güncellendi.");
+    //       dispatch(upsertFiles({ conversationId, files }));
+    //     }
+    //   }
+    // };
+    // // 🔧 DÜZELTİLEN KISIM
 
     const handleStatusUpdate = ({
       messageId,
@@ -288,13 +297,14 @@ const Chat = () => {
       by,
       at,
     }) => {
+      const conv = activeConvRef.current;
       // Sunucu 'status' gönderiyor ("delivered" | "read")
       const ids = messageId ? [messageId] : messageIds || [];
       if (ids.length === 0) return;
       //console.log("mesaj değişmeli: ", ids);
       dispatch(
         applyMessageAck({
-          conversationId: conversationId || activeConversation?._id, // yoksa aktif sohbete yaz
+          conversationId: conversationId || conv?._id, // yoksa aktif sohbete yaz
           messageIds: ids,
           actionType: action, // <- action yerine status kullan
           by,
@@ -304,7 +314,7 @@ const Chat = () => {
     };
 
     const handleUpdatedAvatars = ({ updates }) => {
-      console.log("updates: ", updates);
+      //console.log("updates: ", updates);
       // updates: [{ type, conversationId, avatar }, { type, conversationId, userId, avatar }]
       dispatch(updateConversationAvatars(updates));
     };
@@ -326,7 +336,7 @@ const Chat = () => {
       socket.off("message:status-update", handleStatusUpdate);
     };
     // aktif konuşma değişirse fallback convId güncel kalsın:
-  }, [socket, dispatch, activeConversation?._id]);
+  }, [socket]);
 
   // === Konuşma değişince mesajları getir ===
   useEffect(() => {
@@ -353,7 +363,7 @@ const Chat = () => {
         lastAfterSentRef.current[convId] !== lastId &&
         !lastId.startsWith("tmp_")
       ) {
-        setFetchingNew(true); // after fetch başlıyor → spinner aç
+        fetchingNewRef.current = true; // after fetch başlıyor → spinner aç
         socket.emit("messages-after", {
           conversationId: convId,
           after: lastId,
@@ -362,43 +372,46 @@ const Chat = () => {
 
         lastAfterSentRef.current[convId] = lastId;
       }
-      setFetchingNew(false);
+      fetchingNewRef.current = false;
     }
-  }, [socket, activeConversation?._id, messagesByConv]);
+  }, [socket, activeConversation?._id]); //ConvMessages
 
   useEffect(() => {
     if (!socket) return;
 
     const handleChatlistUpdate = (r) => {
+      const currentActive = activeConvRef.current; // 👈 ref'ten al
       const convId = r.data._id;
-      const isActiveConv = String(convId) === String(activeConversation?._id);
-      const panelAtBottom = isActiveConv ? activeAtBottom : false;
+      const isActiveConv = String(convId) === String(currentActive?._id);
+      const panelAtBottom = isActiveConv
+        ? selectAtBottom(store.getState(), currentActive?._id)
+        : false;
       const isTabVisible = document.visibilityState === "visible";
       const isFromOther = r.data?.last_message?.sender?._id !== userId;
       const myUnread = r.data?.members.find((m) => m.user._id === userId);
+
       dispatch(addOrUpdateConversations([r.data]));
+      console.log(!r.data?.last_message, r.data?.last_message);
       if (
-        isFromOther &&
-        (!isActiveConv || !panelAtBottom || !isTabVisible) &&
-        r.data.last_message?.message?._id !== undefined
+        !r.data?.last_message?._id ||
+        (isFromOther &&
+          (!isActiveConv || !panelAtBottom || !isTabVisible) &&
+          r.data.last_message?.message?._id !== undefined)
       ) {
         dispatch(setUnread({ conversationId: convId, by: myUnread.unread }));
       }
-      console.log("yeni mesaj geldi");
-      console.log("karşı taraftan mı mesaj: ", isFromOther);
       if (isFromOther) {
         // panelAtBottom && isTabVisible && eski if içerideydi burası
         console.log("socketa bildirildi.");
         socket.emit("message:delivered", {
-          messageId: r.data?.last_message.message._id,
-          conversationId: r.data._id,
+          messageId: r?.data?.last_message?.message?._id,
+          conversationId: r?.data?._id,
           userId,
         });
       }
       if (r.message === "send-message") {
         playNotificationSound();
       }
-      console.log(r);
       if (r.message === "group-created") {
         console.log(r.data);
         showNotification(
@@ -412,7 +425,7 @@ const Chat = () => {
     return () => {
       socket.off("chatList:update", handleChatlistUpdate);
     };
-  }, [socket, activeConversation?._id, dispatch, userId, activeAtBottom]);
+  }, [socket, dispatch, userId, showNotification]);
 
   useEffect(() => {
     if (!socket) return;
@@ -510,14 +523,27 @@ const Chat = () => {
   }, [socket, outgoingCall, user, navigate]);
 
   // ————————————————— UI —————————————————
-  const handleOption1Click = () => setActivePage("chatList");
-  const handleFriendRequests = () => setActivePage("friendRequests");
-  const handleOption3Click = () => setActivePage("option3");
-  const handleOption4Click = () => setActivePage("option4");
-  const handleSettings = () => {
+
+  const handleOption1Click = useCallback(() => {
+    setActivePage("chatList");
+  }, []);
+
+  const handleFriendRequests = useCallback(() => {
+    setActivePage("friendRequests");
+  }, []);
+
+  const handleOption3Click = useCallback(() => {
+    setActivePage("option3");
+  }, []);
+
+  const handleOption4Click = useCallback(() => {
+    setActivePage("option4");
+  }, []);
+
+  const handleSettings = useCallback(() => {
     setActivePage("profileSettings");
     setactiveConversationId(null);
-  };
+  }, [setactiveConversationId]);
 
   if (!ready) return <AppLoader progress={progress} />;
   return (
@@ -539,7 +565,7 @@ const Chat = () => {
                 id="option1"
                 onClick={handleOption1Click}
               >
-                <span className="count">{getTotalUnreadMessages()}</span>
+                <span className="count">{totalUnread}</span>
               </button>
             </div>
             <div className="option">
@@ -601,47 +627,20 @@ const Chat = () => {
 
         {/* Chat List */}
         {activePage === "chatList" && (
-          <ChatList
-            conversations={conversations}
-            userId={userId}
-            setactiveConversationId={setactiveConversationId}
-            activeConversationId={activeConversationId}
-            status={status}
-            messagesByConv={messagesByConv}
-            socket={socket}
-            setActiveConversation={setActiveConversation}
-            showNotification={showNotification}
-            activeConversation={activeConversation}
-            spinner={spinner}
-          />
+          <ChatList status={status} socket={socket} spinner={spinner} />
         )}
 
-        {activePage === "friendRequests" && (
-          <FriendRequests socket={socket} showNotification={showNotification} />
-        )}
+        {activePage === "friendRequests" && <FriendRequests socket={socket} />}
         {activePage === "option3" && <Option3 />}
         {activePage === "option4" && <Option4 />}
-        {activePage === "profileSettings" && (
-          <ProfileSettings
-            socket={socket}
-            showNotification={showNotification}
-            activePage={activePage}
-          />
-        )}
+        {activePage === "profileSettings" && <ProfileSettings />}
         {/* Chat Panel */}
         {activePage === "chatList" ? (
           <ChatPanel
-            messages={messagesByConv}
-            activeConversation={activeConversation}
-            fileS={filesByConv}
-            userId={userId}
             socket={socket}
-            fetchingNew={fetchingNew} // 👈 yeni mesaj animasyonu için
+            fetchingNew={fetchingNewRef.current} // 👈 yeni mesaj animasyonu için
             isOnline={isConnected}
-            setActiveConversation={setActiveConversation}
-            setactiveConversationId={setactiveConversationId}
             setOutgoingCall={setOutgoingCall}
-            showNotification={showNotification}
           />
         ) : (
           <SettingsPanel activePage={activePage} />

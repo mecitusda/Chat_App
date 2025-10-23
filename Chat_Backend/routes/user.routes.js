@@ -45,7 +45,6 @@ router.get("/friends/:userId", async (req, res) => {
       if (avatar) f.avatar = avatar;
       friends.push(f);
     }
-    console.log("friends: ",friends)
 
     res.json({ success: true, friends });
   } catch (err) {
@@ -54,33 +53,33 @@ router.get("/friends/:userId", async (req, res) => {
   }
 });
 
-router.get("/:id/friends", async (req, res) => {
-  try {
-    const { id } = req.params;
+// router.get("/:id/friends", async (req, res) => {
+//   try {
+//     const { id } = req.params;
 
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: "Geçersiz kullanıcı id" });
-    }
+//     if (!mongoose.isValidObjectId(id)) {
+//       return res.status(400).json({ success: false, message: "Geçersiz kullanıcı id" });
+//     }
 
-    // Kullanıcıyı bul + arkadaşlarını populate et
-    const user = await User.findById(id)
-      .populate("friends", "_id username status about avatar.url")
-      .lean();
+//     // Kullanıcıyı bul + arkadaşlarını populate et
+//     const user = await User.findById(id)
+//       .populate("friends", "_id username status about avatar.url")
+//       .lean();
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+//     }
 
-    // Arkadaş listesini döndür
-    return res.json({
-      success: true,
-      friends: user.friends || []
-    });
-  } catch (err) {
-    console.error("GET /user/:id/friends", err);
-    res.status(500).json({ success: false, message: "Sunucu hatası" });
-  }
-}); 
+//     // Arkadaş listesini döndür
+//     return res.json({
+//       success: true,
+//       friends: user.friends || []
+//     });
+//   } catch (err) {
+//     console.error("GET /user/:id/friends", err);
+//     res.status(500).json({ success: false, message: "Sunucu hatası" });
+//   }
+// }); 
 
 router.get("/me", authMiddleware, async (req, res) => {
   try {

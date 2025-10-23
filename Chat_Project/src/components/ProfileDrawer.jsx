@@ -1,10 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { addOrUpdateConversations } from "../slices/conversationSlice";
 import axios from "axios";
 import { useEffect } from "react";
 import Avatar from "@mui/material/Avatar";
 import { useOutletContext } from "react-router";
+import AddMemberModal from "./AddMemberModal";
+import formatPhone from "../utils/formatPhone";
+import AllMembersModal from "./AllMembersModal";
+
 export default function ProfileDrawer({
   onClose,
   conversation,
@@ -21,6 +25,10 @@ export default function ProfileDrawer({
   const { showNotification } = useOutletContext();
   const [animateState, setAnimateState] = useState("closed");
   const isGroup = conversation?.type === "group";
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedFriends, setSelectedFriends] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const friends = useSelector((s) => s.friends.friends || []);
   const dispatch = useDispatch();
   const isAdmin = useMemo(() => {
     return isGroup && String(conversation?.createdBy?._id) === String(meId);
@@ -134,6 +142,31 @@ export default function ProfileDrawer({
           dispatch(addOrUpdateConversations([res.conversation]));
         } else {
           showNotification("❌ Grup adı update failed:", res.message);
+        }
+      }
+    );
+  };
+
+  const handleAddMembers = () => {
+    if (!selectedFriends.length) return;
+    setAdding(true);
+
+    socket.emit(
+      "conversation:update",
+      {
+        conversationId: conversation._id,
+        userId: meId,
+        addMembers: selectedFriends,
+      },
+      (res) => {
+        setAdding(false);
+        if (res.success) {
+          dispatch(addOrUpdateConversations([res.conversation]));
+          showNotification("✅ Üyeler başarıyla eklendi.");
+          setShowAddModal(false);
+          setSelectedFriends([]);
+        } else {
+          showNotification("❌ Üyeler eklenemedi.");
         }
       }
     );
@@ -271,6 +304,7 @@ export default function ProfileDrawer({
                   </div>
                 </div>
                 {/* 👥 Grup Katılımcıları */}
+                {/* 👥 Grup Katılımcıları */}
                 {isGroup && (
                   <div className="profile-drawer__members">
                     <div
@@ -281,7 +315,23 @@ export default function ProfileDrawer({
                     </div>
 
                     <ul className="member_items">
-                      {conversation?.members?.map((m) => {
+                      {/* ✅ ÜYE EKLE KUTUSU */}
+                      {isAdmin && (
+                        <li
+                          className="member-item add-member"
+                          onClick={() => setShowAddModal(true)}
+                        >
+                          <div className="add-member__icon">
+                            <i className="fa-solid fa-user-plus"></i>
+                          </div>
+                          <div className="member-info">
+                            <div className="member-name">Üye ekle</div>
+                          </div>
+                        </li>
+                      )}
+
+                      {/* ✅ İlk 7 üyeyi göster */}
+                      {conversation?.members?.slice(0, 7).map((m) => {
                         const u = m?.user || {};
                         const isCreator =
                           String(conversation?.createdBy?._id) ===
@@ -307,21 +357,37 @@ export default function ProfileDrawer({
                                   {u.username || "Bilinmeyen"}
                                 </span>
                                 {isCreator && (
-                                  <span className="member-role">Yönetici</span>
+                                  <span className="member-role">Kurucu</span>
                                 )}
                               </div>
-
-                              {u.phone && (
-                                <div className="member-phone">{u.phone}</div>
-                              )}
-
-                              {u.about && (
-                                <div className="member-about">{u.about}</div>
-                              )}
+                              <div className="member-info-row">
+                                {u.about && (
+                                  <div className="member-about">{u.about}</div>
+                                )}
+                                {u.phone && (
+                                  <div className="member-phone">
+                                    {formatPhone(u.phone)}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </li>
                         );
                       })}
+
+                      {/* 👇 7’den fazla varsa “Tümünü Gör” */}
+                      {conversation?.members?.length > 7 && (
+                        <li
+                          className="member-item view-all"
+                          onClick={() => setView("members")}
+                        >
+                          <div className="member-info">
+                            <div className="member-name">
+                              Tümünü Gör ({conversation.members.length})
+                            </div>
+                          </div>
+                        </li>
+                      )}
                     </ul>
                   </div>
                 )}
@@ -389,6 +455,22 @@ export default function ProfileDrawer({
             </section>
           </div>
         </div>
+        <AddMemberModal
+          show={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          conversation={conversation}
+          meId={meId}
+          socket={socket}
+          showNotification={showNotification}
+          onAdded={(updatedConv) =>
+            dispatch(addOrUpdateConversations([updatedConv]))
+          }
+        />
+        <AllMembersModal
+          show={view === "members"}
+          onClose={() => setView("info")}
+          members={conversation?.members || []}
+        />
       </aside>
     </div>
   );

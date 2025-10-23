@@ -287,6 +287,71 @@ router.get("/:userId", async (req, res) => {
   }
 });
 
+router.post("/:id/add-members", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, addMembers } = req.body; // userId = işlemi yapan kişi
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Geçersiz grup ID" });
+    }
+
+    if (!Array.isArray(addMembers) || addMembers.length === 0) {
+      return res.status(400).json({ success: false, message: "Eklenecek kullanıcı listesi boş" });
+    }
+
+    const conversation = await Conversation.findById(id)
+      .populate("members.user", "username avatar")
+      .populate("createdBy", "username");
+
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: "Grup bulunamadı" });
+    }
+
+    // 🛡️ Yetki kontrolü: sadece admin (createdBy) ekleyebilir
+    if (String(conversation.createdBy._id) !== String(userId)) {
+      return res.status(403).json({ success: false, message: "Yetkisiz işlem" });
+    }
+
+    // 🧠 Eklenecek kullanıcıları getir
+    const users = await User.find({ _id: { $in: addMembers } });
+
+    // 🔁 Zaten grupta olanları filtrele
+    const newMembers = users.filter(
+      (u) => !conversation.members.some((m) => String(m.user._id) === String(u._id))
+    );
+
+    if (!newMembers.length) {
+      return res.status(400).json({ success: false, message: "Tüm kullanıcılar zaten grupta" });
+    }
+
+    // 🏗️ Yeni üyeleri ekle
+    const membersToPush = newMembers.map((u) => ({
+      user: u._id,
+      role: "member",
+      joinedAt: new Date(),
+    }));
+
+    await Conversation.updateOne(
+      { _id: id },
+      { $push: { members: { $each: membersToPush } }, $set: { updated_at: new Date() } }
+    );
+
+    // 🔄 Güncellenmiş halini al
+    const updated = await Conversation.findById(id)
+      .populate("members.user", "username avatar phone about")
+      .populate("createdBy", "username");
+
+    return res.json({
+      success: true,
+      message: `${newMembers.length} üye eklendi.`,
+      conversation: updated,
+    });
+  } catch (err) {
+    console.error("❌ POST /conversation/:id/add-members", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası", error: err.message });
+  }
+});
 
 
 router.post("/private", async (req, res) => {
@@ -528,6 +593,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
+
 
 
 // PATCH

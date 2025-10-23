@@ -81,7 +81,7 @@ router.post("/register", async (req, res) => {
     </div>
   </div>
 </body>
-</html>`;
+    </html>`;
 
     const html = emailTemplate
       .replace("{{username}}", user.username)

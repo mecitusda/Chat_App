@@ -10,8 +10,10 @@ import {
   autoAccept
 } from "../slices/friendSlice";
 import { useUser } from "../contextAPI/UserContext";
+import { useOutletContext } from "react-router";
 
-export function useFriends({socket, showNotification,   setProgress}) {
+export function useFriends({socket, setProgress}) {
+  const {showNotification} = useOutletContext();
   const { user } = useUser();
   const dispatch = useDispatch();
   const { requests, friends } = useSelector((state) => state.friends);

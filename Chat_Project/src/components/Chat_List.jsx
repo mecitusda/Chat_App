@@ -7,10 +7,9 @@ import React, {
   memo,
 } from "react";
 import { FiWifiOff } from "react-icons/fi";
-import { useMediaUrl } from "../hooks/useMediaUrl";
 import DropdownMenu from "./DropdownMenu";
 import { useUser } from "../contextAPI/UserContext";
-import { useSelector } from "react-redux";
+import { shallowEqual, useSelector } from "react-redux";
 import Avatar from "@mui/material/Avatar";
 import { FiVideo, FiMic } from "react-icons/fi";
 import { BsImage } from "react-icons/bs";
@@ -18,7 +17,9 @@ import { HiOutlineDocument, HiOutlineDocumentText } from "react-icons/hi2";
 import { MdGifBox } from "react-icons/md";
 import { PiStickerDuotone } from "react-icons/pi";
 import Spinner from "./Spinner";
-
+import OnlineAvatar from "../components/OnlineAvatar";
+import { makeSelectPresence } from "../slices/presenceSlice";
+import { useOutletContext } from "react-router";
 // ==== helpers ====
 const MAX_SCAN_MSGS = 60; // içerik aramada taranacak mesaj sayısı (son N)
 const norm = (s) => (s || "").toString().toLowerCase();
@@ -43,6 +44,7 @@ function formatSimpleTime(iso) {
     .toString()
     .padStart(2, "0")}.${d.getFullYear()}`;
 }
+
 function highlight(text, q) {
   // Eğer string değilse (örneğin JSX, sayı, null vs), direkt döndür
   if (typeof text !== "string") return text;
@@ -83,11 +85,23 @@ const ChatListItem = memo(function ChatListItem({
     (conversation.members?.[0]?.user?._id === userId
       ? conversation.members?.[1]?.user
       : conversation.members?.[0]?.user);
+
+  // ✅ her user için bir defalık selector oluştur
+  const selectPresenceForUser = other?._id
+    ? makeSelectPresence(other._id)
+    : null;
+
+  const presence = useSelector(
+    selectPresenceForUser ? selectPresenceForUser : () => null
+  );
+
   const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar?.url;
   const lastMsg = conversation.last_message;
+
   return (
     <li className="chat__item" onClick={() => onSelect(conversation._id)}>
-      <Avatar
+      <OnlineAvatar
+        src={avatarUrl || FALLBACK_AVATAR}
         alt={
           isPrivate
             ? conversation.members[0].user._id === userId
@@ -95,8 +109,8 @@ const ChatListItem = memo(function ChatListItem({
               : conversation.members[1].user.username
             : conversation.name
         }
-        src={avatarUrl || FALLBACK_AVATAR}
-        className="chat__avatar"
+        isOnline={presence?.online}
+        className={"chat__avatar"}
       />
       <div className="chat__info">
         <h3 className="chat__name">
@@ -131,19 +145,13 @@ const ChatListItem = memo(function ChatListItem({
   );
 });
 // ========= ANA LISTE =========
-export default function ChatList({
-  conversations = EMPTY,
-  messagesByConv = {}, // <-- YENİ
-  userId,
-  setactiveConversationId,
-  setActiveConversation,
-  activeConversation,
-  status,
-  socket,
-  showNotification,
-  activeConversationId,
-  spinner,
-}) {
+export default function ChatList({ status, socket, spinner }) {
+  const {
+    setActiveConversation,
+    showNotification,
+    activeConversationId,
+    setactiveConversationId,
+  } = useOutletContext();
   // search state
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -151,7 +159,14 @@ export default function ChatList({
   const { user } = useUser();
   const { friends } = useSelector((state) => state.friends);
   const [activeFilter, setActiveFilter] = useState("all"); // "all" | "unread" | "groups"
-
+  const conversations = useSelector(
+    (s) => s.conversations.list || [],
+    shallowEqual
+  );
+  const messagesByConv = useSelector(
+    (s) => s.messages?.byConversation,
+    shallowEqual
+  );
   // function formatMessagePreview(conversation) {
   //   if (!conversation?.last_message) return "";
   //   const type = conversation.last_message?.type;
@@ -316,14 +331,14 @@ export default function ChatList({
     (c) => {
       if (c.type === "private") {
         const other =
-          c.members?.[0]?.user?._id === userId
+          c.members?.[0]?.user?._id === user._id
             ? c.members?.[1]?.user
             : c.members?.[0]?.user;
         return other?.username || "Kullanıcı";
       }
       return c.name || "Grup";
     },
-    [userId]
+    [user?._id]
   );
 
   const filteredFriends = useMemo(() => {
@@ -336,12 +351,13 @@ export default function ChatList({
       .filter((c) => c.type === "private")
       .map(
         (c) =>
-          c.members.find((m) => String(m.user._id) !== String(userId))?.user._id
+          c.members.find((m) => String(m.user._id) !== String(user?._id))?.user
+            ._id
       );
     return friends
       .filter(
         (f) =>
-          f._id !== userId &&
+          f._id !== user?._id &&
           !existingChatUserIds.includes(String(f._id)) && // ✅ zaten sohbeti olanları çıkar
           (f.username.toLowerCase().includes(q) ||
             f.phone?.toLowerCase().includes(q))
@@ -350,7 +366,7 @@ export default function ChatList({
         _id: `friend-${f._id}`,
         friend: f,
       }));
-  }, [debounced, friends, conversations, userId, activeFilter]);
+  }, [debounced, friends, conversations, user?._id, activeFilter]);
 
   // içerik araması + snippet üretimi
 
@@ -554,11 +570,11 @@ export default function ChatList({
                   <ChatListItem
                     key={conv._id}
                     conversation={conv}
-                    userId={userId}
+                    userId={user?._id}
                     onSelect={onSelectConversation}
                     title={
                       conv.type === "private"
-                        ? (conv.members?.[0]?.user?._id === userId
+                        ? (conv.members?.[0]?.user?._id === user?._id
                             ? conv.members?.[1]?.user
                             : conv.members?.[0]?.user
                           )?.username
@@ -587,7 +603,7 @@ export default function ChatList({
                   <div className="chat__info">
                     <h3 className="chat__name">
                       {conv.type === "private"
-                        ? (conv.members?.[0]?.user?._id === userId
+                        ? (conv.members?.[0]?.user?._id === user?._id
                             ? conv.members?.[1]?.user
                             : conv.members?.[0]?.user
                           )?.username
@@ -605,7 +621,7 @@ export default function ChatList({
                             );
                             if (member) {
                               who =
-                                member.user._id !== userId
+                                member.user._id !== user?._id
                                   ? `${member.user.username}: `
                                   : "Sen: ";
                             }

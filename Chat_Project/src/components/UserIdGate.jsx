@@ -1,18 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../contextAPI/UserContext.jsx";
 
 export default function UserIdGate({
   handleClick,
-  setResetEnabled,
+  setResetEnabled, // kullanılmıyor ama bırakalım istersek
   setActiveConversation,
   setactiveConversationId,
 }) {
-  const { setUser, clearUser } = useUser(); // 👈 senin context'teki isimler
+  const { setUser, clearUser } = useUser();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const checkedRef = useRef(false);
 
   useEffect(() => {
+    if (checkedRef.current) return; // yeniden mount edilirse tekrar çağrılmasın
+    checkedRef.current = true;
+
     const checkAuth = async () => {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -31,12 +35,11 @@ export default function UserIdGate({
         );
         const data = await res.json();
 
-        if (data.success) {
-          setUser(data.user); // 👈 user’ı context’e kaydet
+        if (data?.success && data?.user) {
+          setUser(data.user);
         } else {
-          setResetEnabled(true);
           handleClick();
-          clearUser(); // 👈 user’ı sıfırla
+          clearUser();
           setActiveConversation(null);
           setactiveConversationId(null);
           navigate("/login", { replace: true });
@@ -50,11 +53,23 @@ export default function UserIdGate({
       }
     };
 
-    checkAuth(); // sadece mount’ta çalışır
-  }, []);
+    checkAuth();
+  }, [
+    clearUser,
+    setUser,
+    navigate,
+    handleClick,
+    setActiveConversation,
+    setactiveConversationId,
+  ]);
 
   if (loading) {
-    return <div className="loading"></div>;
+    return (
+      <div className="auth-loader">
+        <div className="spinner"></div>
+        <p>Oturum doğrulanıyor...</p>
+      </div>
+    );
   }
 
   return null;

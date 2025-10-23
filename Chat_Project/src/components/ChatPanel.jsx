@@ -9,6 +9,7 @@ import {
   selectOldestMessageId,
 } from "../slices/paginationSlice";
 import MediaLightbox from "./MediaLightbox";
+import { shallowEqual } from "react-redux";
 import ChatInput from "./ChatInput";
 import {
   addOptimisticMessage,
@@ -24,6 +25,7 @@ import { useUser } from "../contextAPI/UserContext";
 import { useInView } from "react-intersection-observer";
 import Avatar from "@mui/material/Avatar";
 import { RiCheckDoubleFill } from "react-icons/ri";
+import { useOutletContext } from "react-router";
 /* ------ Mesaj durum ikonu (aggregate) ------ */
 function getStatusIconByStatus(status) {
   switch (status) {
@@ -175,96 +177,126 @@ function formatDateDivider(dateStr) {
   });
 }
 
-function VisibleMessage({
-  msg,
-  index,
-  isMe,
-  onVisible, // parent'tan batch okuma için
-  renderMessageMedia, // parent fonksiyonu (varsa)
-  computeStatus, // (m) => status
-  isCurrentMatch, // arama highlight
-  conversation,
-  isAvatar,
-  isName,
-}) {
-  const { ref, inView } = useInView({ threshold: 0.7, triggerOnce: true });
-  const metaRef = useRef(null);
-  const [metaWidth, setMetaWidth] = useState(0);
-  useEffect(() => {
-    if (metaRef.current) {
-      setMetaWidth(metaRef.current.offsetWidth);
-    }
-  }, [msg.text, msg.createdAt, isMe]); // mesaj değişince tekrar ölç
-  useEffect(() => {
-    if (!metaRef.current) return;
-    const observer = new ResizeObserver(() => {
-      setMetaWidth(metaRef.current.offsetWidth);
-    });
-    observer.observe(metaRef.current);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
-    if (inView && !isMe && msg?._id) onVisible(msg._id);
-  }, [inView, isMe, msg?._id, onVisible]);
+// 🔥 Advanced render guard versiyonu
+const VisibleMessage = React.memo(
+  function VisibleMessage({
+    msg,
+    index,
+    isMe,
+    onVisible,
+    renderMessageMedia,
+    computeStatus,
+    isCurrentMatch,
+    conversation,
+    isAvatar,
+    isName,
+  }) {
+    const { ref, inView } = useInView({ threshold: 0.7, triggerOnce: true });
+    const metaRef = useRef(null);
+    const [metaWidth, setMetaWidth] = useState(0);
 
-  const hasMedia = msg.type !== "text" && msg.media_url;
+    // Meta genişliğini dinle
+    useEffect(() => {
+      if (metaRef.current) {
+        setMetaWidth(metaRef.current.offsetWidth);
+      }
+    }, [msg.text, msg.createdAt, isMe]);
 
-  return (
-    <div
-      ref={ref}
-      className={`message message--${isMe ? "outgoing" : "incoming"} ${
-        isCurrentMatch ? "message--highlight" : ""
-      } ${isName && !isMe ? "mb-06" : ""} ${
-        msg.type !== "text" ? "mw-40" : ""
-      }`}
-      data-msg-index={index}
-    >
-      {!isMe && isAvatar && (
-        <Avatar
-          alt="Remy Sharp"
-          src={getSender_Avatar(msg, conversation.members)}
-          className="avatar"
-        />
-      )}
-      {hasMedia && renderMessageMedia?.(msg)}
-      <div className="message__content">
-        {msg.text && (
-          <>
-            <span className="message__text">{msg.text}</span>
-          </>
+    useEffect(() => {
+      if (!metaRef.current) return;
+      const observer = new ResizeObserver(() => {
+        setMetaWidth(metaRef.current.offsetWidth);
+      });
+      observer.observe(metaRef.current);
+      return () => observer.disconnect();
+    }, []);
+
+    // görünürse okunduya ekle
+    useEffect(() => {
+      if (inView && !isMe && msg?._id) onVisible(msg._id);
+    }, [inView, isMe, msg?._id, onVisible]);
+
+    const hasMedia = msg.type !== "text" && msg.media_url;
+
+    return (
+      <div
+        ref={ref}
+        className={`message message--${isMe ? "outgoing" : "incoming"} ${
+          isCurrentMatch ? "message--highlight" : ""
+        } ${isName && !isMe ? "mb-06" : ""} ${
+          msg.type !== "text" ? "mw-40" : ""
+        }`}
+        data-msg-index={index}
+      >
+        {/* Avatar (sadece gelen mesajlarda ve grupsa) */}
+        {!isMe && isAvatar && (
+          <Avatar
+            alt="User"
+            src={getSender_Avatar(msg, conversation.members)}
+            className="avatar"
+          />
         )}
-        <span className="message__spacer" style={{ width: metaWidth }}></span>{" "}
-        {/* boşluk için */}
-        <div className="message__meta" ref={metaRef}>
-          <span className="message__time">{formatToHour(msg.createdAt)}</span>
-          {isMe && (
-            <span className="message__status">
-              {getStatusIconByStatus(computeStatus?.(msg))}
-            </span>
-          )}
-        </div>
-      </div>
-      {isName && !isMe && (
-        <div className="sender">
-          {getSender_Name(msg, conversation.members)}
-        </div>
-      )}
-    </div>
-  );
-}
 
-const ChatPanel = ({
-  activeConversation,
-  userId,
-  fileS,
-  socket,
-  fetchingNew,
-  isOnline,
-  setActiveConversation,
-  setactiveConversationId,
-  setOutgoingCall,
-  showNotification,
-}) => {
+        {/* Medya (resim/video vs) */}
+        {hasMedia && renderMessageMedia?.(msg)}
+
+        <div className="message__content">
+          {msg.text && <span className="message__text">{msg.text}</span>}
+          <span className="message__spacer" style={{ width: metaWidth }}></span>
+
+          <div className="message__meta" ref={metaRef}>
+            <span className="message__time">{formatToHour(msg.createdAt)}</span>
+            {isMe && (
+              <span className="message__status">
+                {getStatusIconByStatus(computeStatus?.(msg))}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Grup ismi */}
+        {isName && !isMe && (
+          <div className="sender">
+            {getSender_Name(msg, conversation.members)}
+          </div>
+        )}
+      </div>
+    );
+  },
+
+  // 🧠 advanced comparison function
+  (prev, next) => {
+    // ⚡ sadece önemli alanlardan hafif bir "key" oluştur
+    const prevKey =
+      prev.msg._id +
+      prev.msg.text +
+      (prev.msg.type || "") +
+      (prev.msg.status || "") +
+      (prev.msg.media_url || "");
+
+    const nextKey =
+      next.msg._id +
+      next.msg.text +
+      (next.msg.type || "") +
+      (next.msg.status || "") +
+      (next.msg.media_url || "");
+
+    // değişiklik yoksa render etme
+    return (
+      prevKey === nextKey &&
+      prev.isMe === next.isMe &&
+      prev.isCurrentMatch === next.isCurrentMatch &&
+      prev.isAvatar === next.isAvatar &&
+      prev.isName === next.isName
+    );
+  }
+);
+
+const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
+  const renderCountRef = useRef(0);
+  renderCountRef.current++;
+  const { activeConversation, setActiveConversation, setactiveConversationId } =
+    useOutletContext();
   //console.log("messages: ", messages);
   const { user, setUser } = useUser();
   const convId = activeConversation?._id;
@@ -287,10 +319,17 @@ const ChatPanel = ({
 
   const touchStartYRef = useRef(0);
   const hasTriggeredPullRef = useRef(false);
+  const fileS = useSelector((s) => s.files?.byKey, shallowEqual);
+  const EMPTY_MESSAGES = React.useMemo(() => [], []);
 
   const convMessages = useSelector(
-    (s) => s.messages?.byConversation[activeConversation?._id] || []
+    (state) =>
+      activeConversation?._id
+        ? state.messages?.byConversation[activeConversation._id] || []
+        : EMPTY_MESSAGES,
+    shallowEqual
   );
+
   const canLoadOlder = !!isOnline && !!hasMoreOlder;
   const loaderTimeoutRef = useRef(null);
   const loaderMinVisibleUntil = useRef(0);
@@ -349,11 +388,11 @@ const ChatPanel = ({
     if (!convMessages?.length) return;
 
     const toDeliver = convMessages
-      .filter((m) => String(m?.sender?._id || m?.sender) !== String(userId))
+      .filter((m) => String(m?.sender?._id || m?.sender) !== String(user?._id))
       .filter(
         (m) =>
           !(m.deliveredTo || []).some(
-            (x) => String(x.user?._id || x.user) === String(userId)
+            (x) => String(x.user?._id || x.user) === String(user?._id)
           )
       )
       .map((m) => m._id);
@@ -362,10 +401,10 @@ const ChatPanel = ({
       socket.emit("message:delivered", {
         messageId: id,
         conversationId: convId,
-        userId,
+        userId: user?._id,
       });
     });
-  }, [socket, convId, convMessages, userId]);
+  }, [socket, convId, convMessages, user?._id]);
 
   /* Eski mesajları getir + pozisyon koru */
   const loadOlder = useCallback(() => {
@@ -486,7 +525,7 @@ const ChatPanel = ({
     setIsAtBottom(at);
     wasAtBottomRef.current = at;
     if (convId) dispatch(setAtBottom({ conversationId: convId, atBottom: at }));
-  }, [convId, dispatch]);
+  }, [convId]);
 
   /* Touch/wheel yardımcıları (pull to load) */
   const handleWheel = useCallback(
@@ -519,6 +558,7 @@ const ChatPanel = ({
     },
     [loadOlder, loadingOlder, hasMoreOlder]
   );
+
   const handleScroll = useCallback(() => {
     const el = listRef.current;
     if (!el || loadingOlder) return;
@@ -532,6 +572,7 @@ const ChatPanel = ({
 
     updateAtBottom();
   }, [loadOlder, loadingOlder, hasMoreOlder, updateAtBottom]);
+
   //konuşma değişti
   useEffect(() => {
     if (listRef.current) {
@@ -557,10 +598,10 @@ const ChatPanel = ({
     socket?.emit("message:read", {
       messageIds: ids,
       conversationId: convId,
-      userId,
+      userId: user?._id,
     });
     dispatch(resetUnread(convId));
-  }, [socket, convId, userId, dispatch]);
+  }, [socket, convId, user?._id, dispatch]);
 
   const queueRead = useCallback(
     (id) => {
@@ -583,7 +624,7 @@ const ChatPanel = ({
 
   useEffect(() => {
     const el = listRef.current;
-    if (!el || convMessages.length === 0) return;
+    if (!el || convMessages?.length === 0) return;
 
     // Eski mesaj yüklenirken hiçbir şey yapma
     if (scrollLockRef.current || isPrependingRef.current) return;
@@ -592,8 +633,9 @@ const ChatPanel = ({
     const wasAtBottomBeforeUpdate = wasAtBottomRef.current;
 
     // Son mesajı ben mi gönderdim?
-    const last = convMessages[convMessages.length - 1];
-    const iSent = String(last?.sender?._id || last?.sender) === String(userId);
+    const last = convMessages?.[convMessages?.length - 1];
+    const iSent =
+      String(last?.sender?._id || last?.sender) === String(user?._id);
 
     // DOM boyaması bitsin, sonra uygula
     requestAnimationFrame(() => {
@@ -609,10 +651,10 @@ const ChatPanel = ({
         wasAtBottomRef.current = nowAtBottom;
       }
     });
-  }, [convMessages.length, userId]);
+  }, [convMessages?.length, user?._id]);
 
   const typingText = React.useMemo(() => {
-    const ids = (activeTypers || []).filter((id) => id !== userId);
+    const ids = (activeTypers || []).filter((id) => id !== user?._id);
     if (ids.length === 0) return "";
 
     const nameOf = (uid) => {
@@ -756,13 +798,16 @@ const ChatPanel = ({
       .filter(Boolean);
   }, [convId, convMessages, fileS]);
 
-  const openLightboxForMedia = (mediaUrl) => {
-    const idx = galleryItems.findIndex((it) => it.src === mediaUrl);
-    if (idx >= 0) {
-      setLightboxIndex(idx);
-      setLightboxOpen(true);
-    }
-  };
+  const openLightboxForMedia = useCallback(
+    (mediaUrl) => {
+      const idx = galleryItems.findIndex((it) => it.src === mediaUrl);
+      if (idx >= 0) {
+        setLightboxIndex(idx);
+        setLightboxOpen(true);
+      }
+    },
+    [galleryItems]
+  );
   const closeLightbox = () => setLightboxOpen(false);
   const prevLightbox = () =>
     setLightboxIndex(
@@ -796,15 +841,15 @@ const ChatPanel = ({
   const unreadDividerIndex = React.useMemo(() => {
     if (fetchingNew) return null;
 
-    const unseen = collectUnseen(convMessages, userId);
+    const unseen = collectUnseen(convMessages, user?._id);
     if (!unseen.length) return null;
     const firstUnseenIndex = convMessages.findIndex((m) => m._id === unseen[0]);
     return firstUnseenIndex >= 0 ? firstUnseenIndex : null;
   }, [activeConversation?._id, fetchingNew]);
 
   const headerAvatarUrl = React.useMemo(
-    () => getHeaderAvatarKey(activeConversation, userId),
-    [activeConversation, userId]
+    () => getHeaderAvatarKey(activeConversation, user?._id),
+    [activeConversation, user?._id]
   );
 
   //Search
@@ -945,7 +990,7 @@ const ChatPanel = ({
           <ChatHeader
             name={
               activeConversation?.type === "private"
-                ? activeConversation?.members[0].user._id === userId
+                ? activeConversation?.members[0].user._id === user?._id
                   ? activeConversation?.members[1].user.username
                   : activeConversation?.members[0].user.username
                 : activeConversation?.name
@@ -953,13 +998,12 @@ const ChatPanel = ({
             onOpenProfile={() => setProfileOpen(true)}
             activeConversation={activeConversation}
             avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
-            userId={userId}
+            userId={user?._id}
             setActiveConversation={setActiveConversation}
             setactiveConversationId={setactiveConversationId}
             socket={socket}
             user={user}
             setOutgoingCall={setOutgoingCall}
-            showNotification
             onSearch={handleSearch}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -972,7 +1016,7 @@ const ChatPanel = ({
             <ProfileDrawer
               onClose={() => setProfileOpen(false)}
               conversation={activeConversation}
-              meId={userId}
+              meId={user?._id}
               mediaThumbs={galleryItems
                 .filter((i) => i.type === "image" || i.type === "video")
                 .slice(0, 9)}
@@ -1042,8 +1086,8 @@ const ChatPanel = ({
           </>
         )}
 
-        {convMessages.map((msg, index) => {
-          const isMe = (msg?.sender?._id || msg?.sender) === userId;
+        {convMessages?.map((msg, index) => {
+          const isMe = (msg?.sender?._id || msg?.sender) === user?._id;
           const isMatch = searchResults.includes(index);
           const isCurrentMatch =
             isMatch && searchResults[currentSearchIndex] === index;
@@ -1076,7 +1120,7 @@ const ChatPanel = ({
                 onVisible={queueRead}
                 renderMessageMedia={renderMessageMedia}
                 computeStatus={(m) =>
-                  computeEffectiveStatus(m, activeConversation, userId)
+                  computeEffectiveStatus(m, activeConversation, user?._id)
                 }
                 isCurrentMatch={isCurrentMatch}
                 conversation={activeConversation}
@@ -1208,14 +1252,13 @@ const ChatPanel = ({
           );
         }}
         addoutboxRef={(msg) => {
-          console.log("sıraya eklendi.");
           outboxRef.current.set(msg._id, msg);
         }}
         isOnline={isOnline}
         socket={socket}
         conversationId={activeConversation?._id}
         conversation={activeConversation}
-        userId={userId}
+        userId={user?._id}
         file={file}
         setFile={setFile}
         filePreviewUrl={filePreviewUrl}
@@ -1245,4 +1288,4 @@ const ChatPanel = ({
   );
 };
 
-export default ChatPanel;
+export default React.memo(ChatPanel);

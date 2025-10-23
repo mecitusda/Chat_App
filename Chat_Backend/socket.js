@@ -187,7 +187,7 @@ io.on("connection", (socket) => {
 
     const { data: rq } = await axios.get(`${BACKEND_URL}/api/user/friends/requests/${userId}`);
     socket.emit("friends:requests:list", { success: true, requests: rq.requests || [] });
-    const { data: friends } = await axios.get(`${BACKEND_URL}/api/user/${userId}/friends`);
+    const { data: friends } = await axios.get(`${BACKEND_URL}/api/user/friends/${userId}`);
     socket.emit("friends:list",{
       success:true,friends:friends.friends
     })
@@ -737,6 +737,34 @@ io.on("connection", (socket) => {
     cb?.(res);
   });
 
+   socket.on("conversation:new-user", async ({ conversationId, userId, addMembers }, ack) => {
+    try {
+      const res = await axios.post(
+        `${process.env.BACKEND_URL}/api/conversation/${conversationId}/add-members`,
+        { userId, addMembers },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (!res.data.success) {
+        return ack?.({ success: false, message: res.data.message });
+      }
+
+      const conversation = res.data.conversation;
+      console.log(addMembers, conversation)
+      const user = conversation.members.find((m) => m.user._id === userId)
+      // 🔔 Güncel conversation'ı tüm üyelere gönder
+      addMembers.forEach((m) => {
+        io.to(`user:${m}`).emit("chatList:update", {data:conversation,message:`${user.user.username} sizi ${conversation.name} adlı odaya aldı.`});
+      });
+
+      // ✅ sadece ACK dön, admin tarafı callback alır
+      ack?.({ success: true, conversation });
+      console.log(`👥 ${addMembers.length} yeni üye eklendi (${conversationId})`);
+    } catch (err) {
+      console.error("❌ conversation:new-user hata:", err);
+      ack?.({ success: false, message: err.message });
+    }
+  });
 
 
 

@@ -5,13 +5,14 @@ import { useUser } from "../contextAPI/UserContext";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
 import { MdOutlineDone } from "react-icons/md";
+import { useOutletContext } from "react-router";
 
-export default function ProfileSettings({ socket, showNotification }) {
+export default function ProfileSettings() {
   const fileInputRef = useRef(null);
   const emojiRefName = useRef(null);
   const emojiRefAbout = useRef(null);
   const { user, setUser } = useUser();
-
+  const { showNotification } = useOutletContext();
   const [profileImage, setProfileImage] = useState(
     user.avatar?.url || "/images/default-avatar.jpg"
   );
@@ -48,19 +49,21 @@ export default function ProfileSettings({ socket, showNotification }) {
   // ========================
   // AVATAR FETCH & UPDATE
   // ========================
-  async function fetchUserAvatar() {
-    const now = Date.now();
-    if (
-      (user.avatar && !user.avatar?.url_expiresAt) ||
-      new Date(user.avatar?.url_expiresAt) <= now
-    ) {
-      const { data } = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/user/${user?._id}`
-      );
-      setUser((prev) => ({ ...prev, avatar: data.avatar }));
+  useEffect(() => {
+    async function fetchUserAvatar() {
+      const now = Date.now();
+      if (
+        (user.avatar && !user.avatar?.url_expiresAt) ||
+        new Date(user.avatar?.url_expiresAt) <= now
+      ) {
+        const { data } = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/${user?._id}`
+        );
+        setUser((prev) => ({ ...prev, avatar: data.avatar }));
+      }
     }
-  }
-  fetchUserAvatar();
+    if (user?._id) fetchUserAvatar();
+  }, [user?._id]);
 
   useEffect(() => {
     setProfileImage(user.avatar?.url || "/images/default-avatar.jpg");
@@ -69,9 +72,25 @@ export default function ProfileSettings({ socket, showNotification }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 🔥 önce eski blob varsa temizle
+    if (profileImage && profileImage.startsWith("blob:")) {
+      URL.revokeObjectURL(profileImage);
+    }
+
     setNewFile(file);
-    setProfileImage(URL.createObjectURL(file));
+    const newUrl = URL.createObjectURL(file);
+    setProfileImage(newUrl);
   };
+
+  // 🧹 bileşen kapandığında da son blob’u temizle
+  useEffect(() => {
+    return () => {
+      if (profileImage && profileImage.startsWith("blob:")) {
+        URL.revokeObjectURL(profileImage);
+      }
+    };
+  }, [profileImage]);
 
   const handleAvatarUpdate = async () => {
     if (!newFile) return;

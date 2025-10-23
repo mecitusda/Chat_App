@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSelector } from "react-redux";
-import { selectPresence } from "../slices/presenceSlice";
+import { shallowEqual, useSelector } from "react-redux";
+import { makeSelectPresence } from "../slices/presenceSlice";
 import { FiArrowLeft } from "react-icons/fi"; // Feather
 import { useNavigate } from "react-router";
 import { MdCall, MdClose } from "react-icons/md";
 import { FiVideo } from "react-icons/fi";
 import { FcVideoCall } from "react-icons/fc";
 import { FaSearch, FaChevronUp, FaChevronDown } from "react-icons/fa";
-import Avatar from "@mui/material/Avatar";
+import OnlineAvatar from "../components/OnlineAvatar";
+import SearchInput from "./SearchInput";
 //call onclick
 // onClick={() => {
 //   // Eğer aktif görüşme yoksa → başlat
@@ -118,9 +119,6 @@ const ChatPanel_Header = ({
   setSearchQuery,
 }) => {
   const navigate = useNavigate();
-  const participants = useSelector(
-    (s) => s.calls.byCallId[activeConversation?.active_call] || []
-  );
   const [isSearching, setIsSearching] = useState(searchQuery);
   const inputRef = useRef(null);
 
@@ -143,6 +141,7 @@ const ChatPanel_Header = ({
   const onChange = (e) => {
     onSearch?.(e.target.value);
   };
+
   // --- PRIVATE: karşı tarafın id'si
   const peerId =
     activeConversation?.type === "private"
@@ -151,14 +150,16 @@ const ChatPanel_Header = ({
           : activeConversation.members?.[0]?.user?._id) || null
       : null;
 
+  const selectPresenceForPeer = peerId ? makeSelectPresence(peerId) : null;
   // Tek bir kullanıcının presence'ı lazım olduğunda hedef selector'ı kullan
-  const peerPresence = useSelector((s) =>
-    peerId ? selectPresence(s, peerId) : null
+  const peerPresence = useSelector(
+    (state) => (selectPresenceForPeer ? selectPresenceForPeer(state) : null),
+    shallowEqual
   );
 
   // GROUP için tüm üyelerin presence bilgilerini state’ten ham olarak çek
   // (tek selector, stabil referans; hesaplamayı useMemo ile yapacağız)
-  const presencesByUser = useSelector((s) => s.presences?.byUser || {});
+  const presencesByUser = useSelector((s) => s.presences?.byUser, shallowEqual);
   const groupOnlineNames = useMemo(() => {
     if (activeConversation?.type !== "group") return [];
     const members = activeConversation?.members || [];
@@ -233,12 +234,26 @@ const ChatPanel_Header = ({
         {" "}
         <FiArrowLeft />
       </button>
-      <Avatar
-        alt="Remy Sharp"
+      <OnlineAvatar
         src={avatar}
-        className="chat__header-avatar"
+        alt={
+          activeConversation.type === "private"
+            ? activeConversation.members[0].user._id === userId
+              ? activeConversation.members[0].user.username
+              : activeConversation.members[1].user.username
+            : activeConversation.name
+        }
+        isOnline={
+          peerPresence
+            ? peerPresence.online
+            : groupOnlineNames.length > 0
+            ? true
+            : false
+        }
+        className={"chat__header-avatar"}
         onClick={onOpenProfile}
       />
+
       <div
         className="chat__header-info"
         onClick={onOpenProfile}
@@ -252,56 +267,17 @@ const ChatPanel_Header = ({
       </div>
 
       <div className={"chat__header-options"}>
-        <div
-          className={`chat-header__search  ${
-            isSearching ? "active" : "closed"
-          }`}
-        >
-          <input
-            type="text"
-            ref={inputRef}
-            className={`search-input ${isSearching ? "visible" : ""}`}
-            value={searchQuery}
-            onChange={onChange}
-            placeholder="Mesajlarda ara..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (searchCount > 0) {
-                  onSearchNext();
-                }
-              }
-            }}
-          />
-          <div className="divider"></div>
-          <div className="chat-header__search-nav">
-            <button
-              className={"up"}
-              onClick={onSearchPrev}
-              disabled={searchCount === 0}
-            >
-              <FaChevronUp />
-            </button>
-            <button
-              className={"down"}
-              onClick={onSearchNext}
-              disabled={searchCount === 0}
-            >
-              <FaChevronDown />
-            </button>
-            <span>
-              {searchCount > 0
-                ? `${searchIndex + 1} / ${searchCount}`
-                : "0 / 0"}
-            </span>
-            <button
-              onClick={handleIconClick}
-              aria-label="Kapat"
-              className={`search-toggle ${isSearching ? "expanded" : ""}`}
-            >
-              <MdClose color="#fff" />
-            </button>
-          </div>
-        </div>
+        <SearchInput
+          ref={inputRef}
+          isSearching={isSearching}
+          searchQuery={searchQuery}
+          onChange={onChange}
+          onSearchNext={onSearchNext}
+          onSearchPrev={onSearchPrev}
+          handleIconClick={handleIconClick}
+          searchCount={searchCount}
+          searchIndex={searchIndex}
+        />
         <button
           className={`chat__header-option ${
             !isSearching ? "active" : "closed"
