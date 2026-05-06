@@ -49,7 +49,6 @@ router.post("/join", async (req, res) => {
   try {
     const { conversationId, callerId, callType } = req.body;
 
-    // 1️⃣ Konuşmayı bul
     const conv = await Conversation.findById(conversationId);
     if (!conv) {
       return res
@@ -57,7 +56,6 @@ router.post("/join", async (req, res) => {
         .json({ success: false, message: "Conversation not found" });
     }
 
-    // 2️⃣ Eğer aktif call varsa → katılımcı güncelle veya ekle
     if (conv.active_call) {
       const activeCall = await Call.findById(conv.active_call);
       if (activeCall && !activeCall.ended_at) {
@@ -66,11 +64,11 @@ router.post("/join", async (req, res) => {
         );
 
         if (participantIndex >= 0) {
-          // 🔁 Kullanıcı daha önce katılmış ama çıkmış → left_at sıfırla
+      
           activeCall.participants[participantIndex].left_at = null;
           activeCall.participants[participantIndex].joined_at = new Date();
         } else {
-          // ➕ Yeni kullanıcıyı ekle
+
           activeCall.participants.push({
             user: callerId,
             direction: "incoming",
@@ -83,7 +81,7 @@ router.post("/join", async (req, res) => {
       }
     }
 
-    // 3️⃣ Yeni call oluştur (aktif call yoksa)
+
     const newCall = await Call.create({
       conversation_id: conversationId,
       caller_id: callerId,
@@ -98,7 +96,7 @@ router.post("/join", async (req, res) => {
       status: "ongoing",
     });
 
-    // 4️⃣ Conversation’a bağla
+ 
     conv.active_call = newCall._id;
     await conv.save();
 
@@ -120,18 +118,18 @@ router.post("/leave", async (req, res) => {
       return res.status(404).json({ success: false, message: "Call not found" });
     }
 
-    // 1️⃣ Katılımcının left_at alanını güncelle
+
     const participant = call.participants.find(
       (p) => String(p.user) === String(userId)
     );
 
     if (participant) {
-      // yalnızca zaten aktifse (left_at boşsa) güncelle
+
       if (!participant.left_at) {
         participant.left_at = new Date();
       }
     } else {
-      // 🔸 varsa ama kaydı yoksa (örneğin sistem hatası) ekle
+
       call.participants.push({
         user: userId,
         direction: "incoming",
@@ -142,18 +140,17 @@ router.post("/leave", async (req, res) => {
 
     await call.save();
 
-    // 2️⃣ Aktif (henüz left_at olmayan) kullanıcı var mı?
     const activeUsers = call.participants.filter((p) => !p.left_at);
 
     if (activeUsers.length === 0) {
-      // Son kişi çıktı → call’u kapat
+
       call.ended_at = new Date();
       call.duration = Math.max(
         0,
         Math.round((call.ended_at - call.started_at) / 1000)
       );
 
-      // Sadece arayan varsa → missed, değilse ended
+
       const joinedUsers = call.participants.filter(
         (p) => String(p.user) !== String(call.caller_id)
       );
@@ -161,7 +158,7 @@ router.post("/leave", async (req, res) => {
 
       await call.save();
 
-      // 3️⃣ Conversation'dan aktif call'u kaldır
+ 
       await Conversation.updateOne(
         { active_call: callId },
         { $set: { active_call: null } }

@@ -15,10 +15,9 @@ const MainLayout = () => {
 
   const [activeConversation, setActiveConversation] = useState(null);
   const [resetEnabled, setResetEnabled] = useState(false);
-  const [activeConversationId, setactiveConversationId] = useState(null);
   const { showNotification } = useOutletContext();
+  const [activeProfile, setActiveProfile] = useState(null);
 
-  // ✅ stable callback
   const handleClick = useCallback(() => {
     if (resetEnabled) {
       dispatch(resetConversation());
@@ -29,7 +28,6 @@ const MainLayout = () => {
     }
   }, [dispatch, resetEnabled]);
 
-  // ✅ stable context
   const outletContext = useMemo(
     () => ({
       activeConversation,
@@ -37,18 +35,18 @@ const MainLayout = () => {
       SOCKET_URL,
       setResetEnabled,
       handleClick,
-      activeConversationId,
-      setactiveConversationId,
       showNotification,
+      activeProfile,
+      setActiveProfile,
     }),
     [
       activeConversation,
-      activeConversationId,
       SOCKET_URL,
       setResetEnabled,
       handleClick,
       showNotification,
-    ]
+      activeProfile,
+    ],
   );
 
   return (
@@ -58,7 +56,6 @@ const MainLayout = () => {
         setResetEnabled={setResetEnabled}
         handleClick={handleClick}
         setActiveConversation={setActiveConversation}
-        setactiveConversationId={setactiveConversationId}
       />
 
       {/* Outlet + context forwarding */}

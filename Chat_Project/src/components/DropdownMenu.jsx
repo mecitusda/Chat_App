@@ -19,8 +19,7 @@ export default function DropdownMenu({ socket }) {
   const ref = useRef(null);
   const navigate = useNavigate();
   const { clearUser } = useUser();
-  const { setActiveConversation, setactiveConversationId, showNotification } =
-    useOutletContext();
+  const { setActiveConversation, showNotification } = useOutletContext();
 
   const toggleMenu = () => setOpen(!open);
   const dispatch = useDispatch();
@@ -49,7 +48,6 @@ export default function DropdownMenu({ socket }) {
       dispatch(resetFriends());
       dispatch(resetAllPagination());
       setActiveConversation(null);
-      setactiveConversationId(null);
       clearUser();
       showNotification("🔔Başarıyla çıkış yapıldı.");
       navigate("/login");

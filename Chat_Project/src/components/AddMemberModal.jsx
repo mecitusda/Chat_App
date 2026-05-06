@@ -50,7 +50,7 @@ export default function AddMemberModal({
 
   const handleToggle = (id) => {
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -68,12 +68,12 @@ export default function AddMemberModal({
         setAdding(false);
         if (res.success) {
           onAdded?.(res.conversation);
-          showNotification("✅ Üyeler başarıyla eklendi.");
+          showNotification("Üyeler başarıyla eklendi.");
           handleClose();
         } else {
           showNotification("❌ Üyeler eklenemedi.");
         }
-      }
+      },
     );
   };
 
@@ -173,6 +173,6 @@ export default function AddMemberModal({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

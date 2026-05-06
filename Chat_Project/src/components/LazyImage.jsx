@@ -6,16 +6,12 @@ export default function LazyImage({
   alt,
   onClick,
   observe,
-  className = "", // ✅ dışarıdan gelen className'i destekle
+  className = "",
 }) {
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <div
-      className={`lazy-image-wrapper ${className}`} // ✅ gelen class'ı ekledik
-      onClick={onClick}
-      ref={observe}
-    >
+    <div className={`lazy-image-wrapper ${className}`} ref={observe}>
       <img
         src={thumbSrc}
         alt={alt}

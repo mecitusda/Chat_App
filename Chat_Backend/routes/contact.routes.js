@@ -4,7 +4,7 @@ import Contact from "../models/contacts.js"
 import sendMail from "../config/mailSender.js"
 import { client as redis } from "../utils/redis.js";
 
-// 📩 Mesaj gönder (Formdan gelen veriyi kaydet)
+
 router.post("/", async (req, res) => {
   try {
     const { name, email, phone, message } = req.body;
@@ -14,7 +14,6 @@ router.post("/", async (req, res) => {
         .json({ success: false, message: "Zorunlu alanlar eksik" });
     }
 
-    // 🔍 Kullanıcı IP'sini al (proxy arkasında ise gerçek IP’yi çek)
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
       req.connection.remoteAddress ||
@@ -32,17 +31,17 @@ router.post("/", async (req, res) => {
     }
 
     if (!currentCount) {
-      // İlk mesaj — sayaç oluştur (24 saatlik TTL)
+
       await redis.set(key, 1, { EX: 86400 });
     } else {
-      // Sayaç artır
+
       await redis.incr(key);
     }
 
-    // 🧾 Mesajı MongoDB'ye kaydet
+
     const contact = await Contact.create({ name, email, phone, message });
 
-    // (Opsiyonel) Destek ekibine mail bildirimi
+  
     try {
       await sendMail("usda.mecit@gmail.com", {
         subject: `Scriber - iletişim aldın: ${name}`,
@@ -64,7 +63,7 @@ router.post("/", async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Mesajınız başarıyla gönderildi ✅",
+      message: "Mesajınız başarıyla gönderildi",
       data: contact,
     });
   } catch (err) {
@@ -75,7 +74,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// (Opsiyonel) Admin paneli için mesaj listesi
 router.get("/", async (req, res) => {
   try {
     const contacts = await Contact.find().sort({ createdAt: -1 });

@@ -186,7 +186,7 @@ router.get("/:id/members", async (req, res) => {
    
 //     // 2) Avatarları güncelle
 //     for (const conv of conversations) {
-//       // ✅ Conversation avatar
+//       // Conversation avatar
 //       if (conv.getAvatarUrl) {
 //         const updated = await conv.getAvatarUrl();
 //         if (updated) conv.avatar = updated;
@@ -403,12 +403,11 @@ router.post("/group", async (req, res) => {
     // Tekrarlı üyeleri engelle
     const uniqueMembers = [...new Set([...members, userId])];
 
-    // ✅ avatar alanı obje olmalı
+
     const avatarObj = avatarKey
       ? { key: avatarKey, url: "", url_expiresAt: null }
       : { key: "", url: "", url_expiresAt: null };
 
-    // ✅ conversation oluştur
     let conversation = await Conversation.create({
       type: "group",
       name,
@@ -420,15 +419,15 @@ router.post("/group", async (req, res) => {
       createdBy,
     });
 
-    // ✅ Avatar URL güncelle (eğer key varsa)
+    
     if (conversation.avatar?.key) {
       conversation.avatar = await conversation.getAvatarUrl();
     }
 
 
-    // ✅ Birden fazla conversation için refresh method'u Model üzerinden çağırılır
+   
     const [refreshedConv] = await Conversation.refreshAvatars([conversation]);
-        // ✅ populate işlemleri
+
     await refreshedConv.populate("members.user", "username avatar createdBy");
     await refreshedConv.populate("createdBy", "username");
 
@@ -629,7 +628,7 @@ router.patch("/:id/avatar", async (req, res) => {
       return res.status(404).json({ success: false, message: "Konuşma bulunamadı" });
     }
 
-    // ✅ Güncel URL üret (presigned)
+
     const avatarUrl = await updated.getAvatarUrl();
 
     res.json({
@@ -723,7 +722,7 @@ router.patch("/message/status", async (req, res) => {
 
     const now = new Date();
 
-    // ✅ 1️⃣ Teslim Edildi
+   
     if (action === "delivered") {
       const r = await Message.updateMany(
         { _id: { $in: ids }, "deliveredTo.user": { $ne: by } },
@@ -738,7 +737,7 @@ router.patch("/message/status", async (req, res) => {
       });
     }
 
-    // ✅ 2️⃣ Okundu (read)
+
     if (action === "read") {
       // readBy ve deliveredTo listelerine ekle
       const result = await Message.bulkWrite([
@@ -761,7 +760,6 @@ router.patch("/message/status", async (req, res) => {
         _id: -1,
       });
 
-      // ✅ Kullanıcının lastReadMessageId ve unread bilgilerini güncelle
       await Conversation.updateOne(
         { _id: convId, "members.user": by },
         {
@@ -837,7 +835,8 @@ router.patch("/:id", async (req, res) => {
     await conversation.save();
     await conversation.populate("members.user", "username avatar");
     await conversation.populate("createdBy", "username");
-
+    await conversation.populate("last_message.message","")
+    console.log(conversation)
     res.json({ success: true, conversation });
   } catch (err) {
     console.error("conversation update error:", err.message);

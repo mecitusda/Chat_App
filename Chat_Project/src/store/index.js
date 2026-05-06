@@ -1,6 +1,6 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from "redux-persist";
-import storage from "redux-persist/lib/storage"; // localStorage for small UI state
+import storage from "redux-persist/lib/storage";
 import filesReducer from "../slices/fileSlice";
 import messagesReducer from "../slices/messageSlice";
 import conversationsReducer from "../slices/conversationSlice";
@@ -10,10 +10,11 @@ import uiSliceReducer from "../slices/uiSlice"
 import friendSliceReducer from "../slices/friendSlice"
 import notificationReducer from "../slices/notificationSlice"
 import callReducer from "../slices/callSlice"
+
 const rootPersistConfig = {
   key: "root",
   storage,
-  whitelist: ["files", "messages", "conversations","paginations","presences","uiSlices","notifications","friends","calls"], // keep small indexes/metadata in LS
+  whitelist: ["ui"], 
 };
 
 const rootReducer = combineReducers({

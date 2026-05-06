@@ -10,8 +10,9 @@ import { client as redis } from "../utils/redis.js";
 const router = express.Router();
 import sendMail from "../config/mailSender.js"
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
-const RESET_CODE_TTL_SEC = 120; // 2 dakika
+const RESET_CODE_TTL_SEC = 120; 
 const RESET_JWT_TTL = "5m";
+
 // POST
 
 router.post("/register", async (req, res) => {
@@ -29,24 +30,23 @@ router.post("/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 6 haneli kod
+  
     const verifyCode = crypto.randomInt(100000, 999999).toString();
 
-    // Kullanıcıyı oluştur (DB’de saklamak istiyorsan alanlar kalabilir ama şart değil)
+
     const user = await User.create({
       username,
       email,
       phone,
       password_hash: hashedPassword,
-      // İstersen bu iki alanı artık kullanma; Redis TTL zaten daha güvenli:
-      verifyCode,                           // (opsiyonel)
-      verifyCodeExpires: Date.now() + 2 * 60 * 1000, // (opsiyonel) 2 dk
+      verifyCode,                         
+      verifyCodeExpires: Date.now() + 2 * 60 * 1000,
       emailVerified: false,
     });
 
-    await redis.set(`verify:${email}`, verifyCode, { EX: 120 }); // 120sn
+    await redis.set(`verify:${email}`, verifyCode, { EX: 120 }); 
 
-    // Mail şablonu
+   
     const emailTemplate = `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -114,19 +114,18 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ success: false, message: "Şifre hatalı" });
     }
 
-    // ✅ Avatar URL expired mi kontrol et
     if (user.avatar?.key) {
       const avatarObj = await user.getAvatarUrl();
       user.avatar.url = avatarObj.newUrl || avatarObj; // senin getAvatarUrl yapına göre
       user.avatar.url_expiresAt = avatarObj.url_expiresAt || null;
     }
 
-    // ✅ JWT oluştur
+
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
-    // ✅ Temiz user objesi
+   
     const safeUser = user.toObject();
     delete safeUser.password_hash;
     delete safeUser.__v;
@@ -173,18 +172,17 @@ router.post("/send-reset-code", async (req, res) => {
 
     // Rate-limit (1 dk arayla)
     const keyLimit = `reset:limit:${email}`;
-    if (await redis.exists(keyLimit))
+   if (await redis.exists(keyLimit))
       return res.status(429).json({ success: false, message: "Lütfen biraz sonra tekrar deneyin." });
 
     const code = crypto.randomInt(100000, 999999).toString();
     const hash = await bcrypt.hash(code, 10);
 
-    // Hash ve süreyi Redis’e yaz
     const key = `reset:code:${email}`;
     await redis.setEx(key, RESET_CODE_TTL_SEC, hash);
-    await redis.setEx(keyLimit, 60, "1"); // rate-limit anahtarı
+    await redis.setEx(keyLimit, 60, "1"); 
 
-    // E-posta gönder
+
     const html =  `
   <!DOCTYPE html>
   <html lang="tr">
@@ -287,15 +285,13 @@ router.post("/verify-reset-code", async (req, res) => {
     const ok = await bcrypt.compare(code, hash);
     if (!ok) return res.status(400).json({ success: false, message: "Kod hatalı" });
 
-    // Tek kullanımlık token
     const jti = crypto.randomUUID();
     const token = jwt.sign({ email, jti, action: "password_reset" }, JWT_SECRET, {
       expiresIn: RESET_JWT_TTL,
     });
 
-    // Redis'e "doğrulandı" durumu kaydı (tek kullanımlık)
     await redis.setEx(`reset:token:${email}`, 300, jti);
-    await redis.del(key); // kod artık silinir
+    await redis.del(key);
 
     return res.json({ success: true, token });
   } catch (err) {
@@ -343,7 +339,7 @@ router.post("/change-password-email", async (req, res) => {
         .status(404)
         .json({ success: false, message: "Kullanıcı bulunamadı" });
 
-    // 🔒 Eski şifreyle aynı mı kontrol et
+
     const isSamePassword = await bcrypt.compare(
       newPassword,
       user.password_hash
@@ -355,11 +351,10 @@ router.post("/change-password-email", async (req, res) => {
       });
     }
 
-    // Yeni şifreyi hashle ve kaydet
+
     user.password_hash = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    // Token iptal (replay engeli)
     await redis.del(`reset:token:${payload.email}`);
 
     return res.json({
@@ -389,16 +384,14 @@ router.post("/resend-verification", async (req, res) => {
     if (user.emailVerified)
       return res.json({ success: false, message: "E-posta zaten doğrulanmış" });
 
-    // Yeni kod üret
+
     const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Eski kodu geçersiz kıl
     await redis.del(`verify:${email}`);
 
-    // Yeni kodu 2 dakika boyunca geçerli olacak şekilde sakla
+
     await redis.set(`verify:${email}`, verifyCode, "EX", RESET_JWT_TTL);
 
-    // Token (isteğe bağlı)
     const token = jwt.sign(
       { email, code: verifyCode, action: "email_verify" },
       JWT_SECRET,
@@ -450,7 +443,6 @@ router.post("/verify-email", async (req, res) => {
     if (user.emailVerified)
       return res.json({ success: false, message: "E-posta zaten doğrulanmış" });
 
-    // Redis'teki kodu çek
     const storedCode = await redis.get(`verify:${email}`);
     if (!storedCode)
       return res
@@ -462,14 +454,14 @@ router.post("/verify-email", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Kod hatalı" });
 
-    // Başarılıysa:
+
     user.emailVerified = true;
     await user.save();
 
-    // Kodu iptal et (replay engeli)
+
     await redis.del(`verify:${email}`);
 
-    // Yeni JWT (isteğe bağlı)
+  
     const token = jwt.sign(
       { userId: user._id, action: "email_verified" },
       JWT_SECRET,

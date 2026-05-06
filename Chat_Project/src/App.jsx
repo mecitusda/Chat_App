@@ -15,6 +15,7 @@ import Home from "./pages/Home.jsx";
 import CallPage from "./pages/CallPage.jsx";
 import "./css/main.css";
 import RootLayout from "./Layouts/RootLayout.jsx";
+import { StrictMode } from "react";
 const routes = createBrowserRouter([
   {
     element: <RootLayout />, // 🟢 Context sağlayan root
@@ -50,7 +51,9 @@ function App() {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <UserContextProvider>
-          <RouterProvider router={routes} />
+          <StrictMode>
+            <RouterProvider router={routes} />
+          </StrictMode>
         </UserContextProvider>
       </PersistGate>
     </Provider>

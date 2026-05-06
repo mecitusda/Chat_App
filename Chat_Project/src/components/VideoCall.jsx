@@ -39,7 +39,7 @@ export default function VideoCall({
         return;
       }
 
-      // ✅ Get camera/mic
+      // Get camera/mic
       const localStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false,
@@ -58,7 +58,7 @@ export default function VideoCall({
         console.log(`⚙️ Peer ready: ${peerId}`);
 
         setParticipants((prev) =>
-          prev.includes(peerId) ? prev : [...prev, peerId]
+          prev.includes(peerId) ? prev : [...prev, peerId],
         );
 
         // Only start offer if my ID is smaller (avoid glare)

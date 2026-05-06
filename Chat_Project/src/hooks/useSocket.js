@@ -143,7 +143,25 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
   const socketRef = useRef(null);
   const [status, setStatus] = useState("connecting");
 
-  // ✅ sadece ilk mount'ta socket kur
+  const handlersRef = useRef({
+    dispatch,
+    addOrUpdateConversations,
+    setSpinner,
+    setProgress,
+    userId,
+  });
+
+  useEffect(() => {
+    handlersRef.current = {
+      dispatch,
+      addOrUpdateConversations,
+      setSpinner,
+      setProgress,
+      userId,
+    };
+  });
+
+
   if (!socketRef.current && SOCKET_URL) {
     socketRef.current = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -156,11 +174,14 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
 
   const socket = socketRef.current;
 
+
   useEffect(() => {
     if (!socket) return;
-    setProgress(20);
+    handlersRef.current.setProgress(20);
 
     const onChatList = (payload) => {
+      const { dispatch, addOrUpdateConversations, setProgress, setSpinner, userId } = handlersRef.current;
+      
       setProgress(40);
       const list = Array.isArray(payload?.conversations)
         ? payload.conversations
@@ -168,7 +189,6 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
       if (Array.isArray(list)) {
         dispatch(addOrUpdateConversations(list));
       }
-      console.log("socketten güncellendi.");
 
       for (const conv of payload.conversations || []) {
         const myUnread = conv?.members?.find((m) => m.user._id === userId);
@@ -177,16 +197,20 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
         }
       }
 
-
       setProgress(60);
       setSpinner(false);
     };
 
     const last_seen = localStorage.getItem("last_seen");
     const onConnect = () => {
+      const { userId, setSpinner } = handlersRef.current;
       setStatus("connected");
       setSpinner(true);
       if (userId) socket.emit("join-chat", { userId, last_seen });
+    };
+
+    const onPresenceUpdate = (p) => {
+      handlersRef.current.dispatch(setPresence(p));
     };
 
     const onDisconnect = () => setStatus("reconnecting");
@@ -195,7 +219,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
     const onReconnectFailed = () => setStatus("offline");
 
     socket.on("chatList", onChatList);
-    socket.on("presence:update", (p) => dispatch(setPresence(p)));
+    socket.on("presence:update", onPresenceUpdate);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
@@ -204,18 +228,21 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
 
     return () => {
       socket.off("chatList", onChatList);
-      socket.off("presence:update");
+      socket.off("presence:update", onPresenceUpdate);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onConnectError);
       socket.io.off("reconnect_attempt", onReconnectAttempt);
       socket.io.off("reconnect_failed", onReconnectFailed);
-      // ❌ socket.close() yapma! Tek bağlantı kalmalı
     };
-  }, [socket, userId, dispatch, addOrUpdateConversations]);
+  }, [socket]); 
 
+ 
   useEffect(() => {
-    if (!socket || !userId) return;
+    if (!socket) return;
+    const { userId, dispatch } = handlersRef.current;
+    if (!userId) return;
+
     const convPeerIds = conversations
       .flatMap((c) =>
         c.type === "private"
@@ -236,7 +263,7 @@ export function useSocket(SOCKET_URL, userId, addOrUpdateConversations, conversa
     });
 
     return () => socket.emit("presence:unsubscribe", { userIds: ids });
-  }, [socket, userId, conversations, friends, dispatch]);
+  }, [socket, conversations, friends]);
 
   return { socket, status, isConnected: status === "connected" };
 }

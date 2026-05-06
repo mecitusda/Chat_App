@@ -2,12 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../contextAPI/UserContext.jsx";
 
-export default function UserIdGate({
-  handleClick,
-  setResetEnabled, // kullanılmıyor ama bırakalım istersek
-  setActiveConversation,
-  setactiveConversationId,
-}) {
+export default function UserIdGate({ handleClick, setActiveConversation }) {
   const { setUser, clearUser } = useUser();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -41,7 +36,6 @@ export default function UserIdGate({
           handleClick();
           clearUser();
           setActiveConversation(null);
-          setactiveConversationId(null);
           navigate("/login", { replace: true });
         }
       } catch (err) {
@@ -54,14 +48,7 @@ export default function UserIdGate({
     };
 
     checkAuth();
-  }, [
-    clearUser,
-    setUser,
-    navigate,
-    handleClick,
-    setActiveConversation,
-    setactiveConversationId,
-  ]);
+  }, [clearUser, setUser, navigate, handleClick, setActiveConversation]);
 
   if (loading) {
     return (

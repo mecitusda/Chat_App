@@ -62,7 +62,7 @@ const presenceSlice = createSlice({
   name: "presences",
   initialState,
   reducers: {
-    /** ✅ Tek bir kullanıcının presence'ını güncelle (yalnızca değişmişse) */
+
     setPresence(state, { payload }) {
       const { userId, online, lastSeen } = payload || {};
       if (!userId) return;
@@ -87,7 +87,7 @@ const presenceSlice = createSlice({
       }
     },
 
-    /** ✅ Toplu güncelleme (yalnızca değişen kullanıcılar) */
+
     setPresenceBulk(state, { payload }) {
       for (const [uid, obj] of Object.entries(payload || {})) {
         const prev = state.byUser[uid];
@@ -110,30 +110,28 @@ const presenceSlice = createSlice({
 export const { setPresence, setPresenceBulk } = presenceSlice.actions;
 export default presenceSlice.reducer;
 
-/**
- * ✅ Memoized selector factory (her userId için sabit referans)
- */
+
 export const makeSelectPresence = (userId) => {
   if (!userId) return () => null;
 
-  // Eğer cache'de varsa doğrudan onu döndür
+
   if (selectorCache.has(userId)) return selectorCache.get(userId);
 
-  // Redux createSelector memoization kullanır
+
   const selector = createSelector(
     [(state) => state.presences?.byUser?.[userId]],
     (presence) => {
-      // referans sabitleme: aynı değer geldiyse aynı obje döndür
+  
       if (!presence) return null;
 
-      // küçük internal cache tutalım
+   
       let last = selector._last;
       if (
         last &&
         last.online === presence.online &&
         last.lastSeen === presence.lastSeen
       ) {
-        return last; // referans aynı kalır
+        return last;
       }
 
       const res = {

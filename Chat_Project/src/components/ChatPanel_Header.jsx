@@ -1,15 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { shallowEqual, useSelector } from "react-redux";
 import { makeSelectPresence } from "../slices/presenceSlice";
 import { FiArrowLeft } from "react-icons/fi"; // Feather
-import { useNavigate } from "react-router";
+import { useNavigate, useOutletContext } from "react-router";
 import { MdCall, MdClose } from "react-icons/md";
 import { FiVideo } from "react-icons/fi";
 import { FcVideoCall } from "react-icons/fc";
 import { FaSearch, FaChevronUp, FaChevronDown } from "react-icons/fa";
 import OnlineAvatar from "../components/OnlineAvatar";
 import SearchInput from "./SearchInput";
+import { useUser } from "../contextAPI/UserContext";
 //call onclick
 // onClick={() => {
 //   // Eğer aktif görüşme yoksa → başlat
@@ -94,22 +95,14 @@ function getActiveParticipantsCount(conversation) {
 
   // joined_at dolu ama left_at olmayanları say
   return conversation.active_call.participants.filter(
-    (p) => p.joined_at && !p.left_at
+    (p) => p.joined_at && !p.left_at,
   ).length;
 }
 
 const ChatPanel_Header = ({
   activeConversation,
-  userId,
-  name,
   avatar,
-  onOpenProfile,
-  setActiveConversation,
-  setactiveConversationId,
-  socket,
-  user,
-  setOutgoingCall,
-  showNotification,
+  setProfileOpen,
   onSearch,
   searchQuery,
   searchIndex,
@@ -118,16 +111,25 @@ const ChatPanel_Header = ({
   onSearchPrev,
   setSearchQuery,
 }) => {
-  const navigate = useNavigate();
-  const [isSearching, setIsSearching] = useState(searchQuery);
+  const { user } = useUser();
+  const { setActiveProfile, setActiveConversation } = useOutletContext();
+  const [isSearching, setIsSearching] = useState(!!searchQuery);
   const inputRef = useRef(null);
-
   const handleIconClick = () => {
-    console.log("nullandı.");
     setSearchQuery(null);
     setIsSearching(false);
   };
+  const onOpenProfile = () => {
+    setActiveProfile(activeConversation);
+    setProfileOpen(true);
+  };
 
+  const name =
+    activeConversation?.type === "private"
+      ? activeConversation?.members[0].user._id === user?._id
+        ? activeConversation?.members[1].user.username
+        : activeConversation?.members[0].user.username
+      : activeConversation?.name;
   useEffect(() => {
     if (isSearching) {
       inputRef.current?.focus();
@@ -136,7 +138,7 @@ const ChatPanel_Header = ({
 
   useEffect(() => {
     setIsSearching(false);
-  }, [activeConversation._id]);
+  }, [activeConversation?._id]);
 
   const onChange = (e) => {
     onSearch?.(e.target.value);
@@ -145,7 +147,7 @@ const ChatPanel_Header = ({
   // --- PRIVATE: karşı tarafın id'si
   const peerId =
     activeConversation?.type === "private"
-      ? (activeConversation.members?.[0]?.user?._id === userId
+      ? (activeConversation.members?.[0]?.user?._id === user?._id
           ? activeConversation.members?.[1]?.user?._id
           : activeConversation.members?.[0]?.user?._id) || null
       : null;
@@ -154,7 +156,7 @@ const ChatPanel_Header = ({
   // Tek bir kullanıcının presence'ı lazım olduğunda hedef selector'ı kullan
   const peerPresence = useSelector(
     (state) => (selectPresenceForPeer ? selectPresenceForPeer(state) : null),
-    shallowEqual
+    shallowEqual,
   );
 
   // GROUP için tüm üyelerin presence bilgilerini state’ten ham olarak çek
@@ -164,10 +166,10 @@ const ChatPanel_Header = ({
     if (activeConversation?.type !== "group") return [];
     const members = activeConversation?.members || [];
     return members
-      .filter((m) => String(m?.user?._id) !== String(userId)) // kendini listeleme (isteğe bağlı)
+      .filter((m) => String(m?.user?._id) !== String(user?._id)) // kendini listeleme (isteğe bağlı)
       .filter((m) => presencesByUser?.[m.user._id]?.online)
       .map((m) => m.user?.username || "Bilinmeyen");
-  }, [activeConversation, userId, presencesByUser]);
+  }, [activeConversation, user?._id, presencesByUser]);
 
   // Status metni:
   const statusText =
@@ -176,59 +178,21 @@ const ChatPanel_Header = ({
         ? "Çevrimiçi"
         : formatLastSeen(peerPresence?.lastSeen)
       : // group
-      groupOnlineNames.length
-      ? // Çok kişi varsa kısalt: ilk 2 + “+N kişi”
-        groupOnlineNames.length > 2
-        ? `${groupOnlineNames.slice(0, 2).join(", ")} +${
-            groupOnlineNames.length - 2
-          } kişi çevrimiçi`
-        : `${groupOnlineNames.join(", ")} çevrimiçi`
-      : "Şu an kimse çevrimiçi değil";
+        groupOnlineNames.length
+        ? // Çok kişi varsa kısalt: ilk 2 + “+N kişi”
+          groupOnlineNames.length > 2
+          ? `${groupOnlineNames.slice(0, 2).join(", ")} +${
+              groupOnlineNames.length - 2
+            } kişi çevrimiçi`
+          : `${groupOnlineNames.join(", ")} çevrimiçi`
+        : "Şu an kimse çevrimiçi değil";
 
-  const handleStartCall = () => {
-    if (!socket || !user) return;
-    const peerIds = (activeConversation?.members || [])
-      .map((m) => m.user?._id)
-      .filter(Boolean);
-
-    socket.emit(
-      "call:create-or-join",
-      {
-        conversationId: activeConversation._id,
-        userId: user._id,
-        callType: "video",
-        conversationType: activeConversation.type, // "private" | "group"
-        peers: peerIds,
-      },
-      (res) => {
-        if (!res.success) {
-          showNotification("Call başlatılamadı: " + res.message);
-          return;
-        }
-
-        const callId = res.callId;
-
-        if (activeConversation.type === "group") {
-          // ✅ Grup → direkt odaya gir
-          navigate(`/call/${res.callId}`, { state: { callerId: user._id } });
-        } else {
-          // ✅ Private → bekleme ekranına al
-          setOutgoingCall({
-            callId,
-            peerId: peerIds.find((id) => id !== user._id),
-            conversationId: activeConversation._id,
-          });
-        }
-      }
-    );
-  };
   return (
     <div className="chat__header">
       <button
         className={`back-btn`}
         onClick={() => {
           setActiveConversation(null);
-          setactiveConversationId(null);
         }}
       >
         {" "}
@@ -238,7 +202,7 @@ const ChatPanel_Header = ({
         src={avatar}
         alt={
           activeConversation.type === "private"
-            ? activeConversation.members[0].user._id === userId
+            ? activeConversation.members[0].user._id === user?._id
               ? activeConversation.members[0].user.username
               : activeConversation.members[1].user.username
             : activeConversation.name
@@ -247,8 +211,8 @@ const ChatPanel_Header = ({
           peerPresence
             ? peerPresence.online
             : groupOnlineNames.length > 0
-            ? true
-            : false
+              ? true
+              : false
         }
         className={"chat__header-avatar"}
         onClick={onOpenProfile}
@@ -278,6 +242,7 @@ const ChatPanel_Header = ({
           searchCount={searchCount}
           searchIndex={searchIndex}
         />
+
         <button
           className={`chat__header-option ${
             !isSearching ? "active" : "closed"
@@ -290,7 +255,6 @@ const ChatPanel_Header = ({
             }}
           />
         </button>
-
         <div className="disabled-tip" data-tip="Geliştirme aşamasında">
           <button
             className={`chat__header-option ${
@@ -321,4 +285,11 @@ const ChatPanel_Header = ({
   );
 };
 
-export default ChatPanel_Header;
+export default React.memo(ChatPanel_Header, (prev, next) => {
+  return (
+    prev.activeConversation === next.activeConversation && // sadece id değişirse render et
+    prev.searchQuery === next.searchQuery &&
+    prev.searchCount === next.searchCount &&
+    prev.searchIndex === next.searchIndex
+  );
+});

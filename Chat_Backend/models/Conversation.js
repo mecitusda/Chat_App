@@ -38,7 +38,7 @@ const ConversationSchema = new mongoose.Schema({
 ConversationSchema.index({ _id: 1, "members.user": 1 });
 
 
-// ✅ Tek conversation için avatar kontrolü
+
 ConversationSchema.methods.getAvatarUrl = async function () {
   const now = new Date();
 
@@ -58,7 +58,6 @@ ConversationSchema.methods.getAvatarUrl = async function () {
 };
 
 
-// ✅ Birden fazla conversation için helper
 ConversationSchema.statics.refreshAvatars = async function (conversations) {
   const now = new Date();
 
@@ -76,7 +75,7 @@ ConversationSchema.statics.refreshAvatars = async function (conversations) {
 };
 
 
-// ✅ JSON dönüşümünde gizleme
+
 ConversationSchema.set("toJSON", {
   transform: function (doc, ret) {
     if (ret.avatar) {

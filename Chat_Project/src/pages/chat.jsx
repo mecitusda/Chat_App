@@ -41,16 +41,18 @@ import { useMemo } from "react";
 import { useCallback } from "react";
 import useMemoryMonitor from "../hooks/useMemoryMonitor";
 
+import { useMessageSocket } from "../hooks/useMessageSocket";
+import { useConversationSocket } from "../hooks/useConversationSocket";
+import { useCallSocket } from "../hooks/useCallSocket";
+
 const Chat = () => {
-  useMemoryMonitor(5000); // 5 saniyede bir ölçüm
+  //useMemoryMonitor(30000); // 5 saniyede bir ölçüm
   const activeConvRef = useRef(null);
   const {
     activeConversation,
     setActiveConversation,
     SOCKET_URL,
     showNotification,
-    activeConversationId,
-    setactiveConversationId,
   } = useOutletContext();
 
   const playNotificationSound = useCallback(() => {
@@ -81,12 +83,12 @@ const Chat = () => {
   const [outgoingCall, setOutgoingCall] = useState(null);
   const conversations = useSelector(
     (s) => s.conversations.list || [],
-    shallowEqual
+    shallowEqual,
   );
 
   const messagesByConv = useSelector(
     (s) => s.messages?.byConversation,
-    shallowEqual
+    shallowEqual,
   );
   const filesByConv = useSelector((s) => s.files?.byKey, shallowEqual);
   const { requests, friends } = useSelector((state) => state.friends);
@@ -114,24 +116,44 @@ const Chat = () => {
     friends,
     dispatch,
     setSpinner,
-    setProgress
+    setProgress,
   );
 
-  useFriends({ socket, setProgress }); // socket listener’ları Redux’a bağlar
+  useFriends({ socket, setProgress });
+
+  useMessageSocket(socket, dispatch, activeConvRef, userId);
+  useConversationSocket(
+    socket,
+    dispatch,
+    activeConvRef,
+    userId,
+    playNotificationSound,
+    showNotification,
+  );
+  useCallSocket(
+    socket,
+    dispatch,
+    user,
+    outgoingCall,
+    setIncomingCall,
+    setOutgoingCall,
+    showNotification,
+    navigate,
+  );
 
   useEffect(() => {
-    if (!activeConversationId) return;
+    if (!activeConversation?._id) return;
     const fresh = conversations.find(
-      (c) => String(c._id) === String(activeConversationId)
+      (c) => String(c._id) === String(activeConversation?._id),
     );
     if (fresh) setActiveConversation(fresh);
-  }, [activeConversationId, conversations]);
+  }, [activeConversation?._id, conversations]);
   // Aynı lastId için üst üste messages-after emit etmemek için guard
   const lastAfterSentRef = useRef({}); // { [convId]: lastAfterId }
 
   const totalUnread = useMemo(
     () => conversations.reduce((sum, c) => sum + (c.unread || 0), 0),
-    [conversations]
+    [conversations],
   );
 
   useEffect(() => {
@@ -151,7 +173,7 @@ const Chat = () => {
     const expiredFileMsgIds = Object.entries(files)
       .filter(
         ([, f]) =>
-          !f.media_url_expiresAt || new Date(f.media_url_expiresAt) <= now
+          !f.media_url_expiresAt || new Date(f.media_url_expiresAt) <= now,
       )
       .map(([msgId]) => msgId);
     if (expiredFileMsgIds.length > 0) {
@@ -161,182 +183,6 @@ const Chat = () => {
       });
     }
   }, [socket, activeConversation?._id]);
-
-  // === Socket listeners (tek sefer bağla) ===
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleMessageList = (newData) => {
-      const arr = newData?.messages || [];
-      const page = newData?.pageInfo || {};
-      fetchingNewRef.current = false;
-      const convId =
-        newData.conversationId ||
-        arr[0]?.conversation ||
-        activeConversation?._id;
-      if (!convId) return;
-
-      if (typeof page.hasMoreBefore === "boolean") {
-        dispatch(
-          setHasMore({ conversationId: convId, hasMore: page.hasMoreBefore })
-        );
-      }
-      if (arr.length === 0) return;
-      //console.log("yeni mesaj eklendi. ", newData.text);
-      const direction = page.before ? "prepend" : "append";
-      dispatch(
-        addOrUpdateMessages({
-          conversationId: convId,
-          messages: arr,
-          direction,
-        })
-      );
-
-      const oldest = arr[0]?._id || null;
-      if (oldest) {
-        dispatch(
-          setOldestMessageId({ conversationId: convId, messageId: oldest })
-        );
-      }
-
-      const minimal = arr
-        .filter((m) => m && m.type !== "text" && m.media_url)
-        .reduce((acc, m) => {
-          acc[m._id] = {
-            media_url: m.media_url,
-            media_url_expiresAt: m.media_url_expiresAt,
-          };
-          return acc;
-        }, {});
-      //console.log("minimal: ", minimal);
-      if (minimal) {
-        //console.log("dosyayı ekliyor.");
-        dispatch(upsertFiles({ conversationId: convId, files: minimal }));
-      }
-
-      //console.log("arr: ", arr);
-      // (opsiyonel) burada tek tek delivered tetikliyorsun; sunucu tarafında batch zaten yapıyorsan kaldırabilirsin:
-      const toDeliver = arr
-        .filter((m) => String(m?.sender?._id || m?.sender) !== String(userId))
-        .filter(
-          (m) =>
-            !(m.deliveredTo || []).some(
-              (x) => String(x.user?._id || x.user) === String(userId)
-            )
-        )
-        .map((m) => m._id);
-      //console.log("todeliver: ", toDeliver);
-      toDeliver.forEach((id) => {
-        socket.emit("message:delivered", {
-          messageId: id,
-          conversationId: convId,
-          userId,
-        });
-      });
-      if (totalUnread > 0) {
-        document.title = `(${totalUnread})Chat`;
-      } else {
-        document.title = "Chat";
-      }
-    };
-
-    const handlePreUrls = ({ urls, conversationId }) => {
-      const TTL_MS = 10 * 60 * 1000; // 10 dk (backend ile aynı süre)
-
-      const enriched = (urls || []).reduce((acc, u) => {
-        acc[u.messageId] = {
-          media_url: u.media_url,
-          media_url_expiresAt: new Date(Date.now() + TTL_MS).toISOString(),
-        };
-        return acc;
-      }, {});
-
-      if (Object.keys(enriched).length > 0) {
-        dispatch(upsertFiles({ conversationId, files: enriched }));
-      }
-    };
-
-    // const handleAvatarPreUrls = (data) => {
-    //   if (!data || typeof data !== "object") return;
-    //   // backend 3600s veriyorsa küçük bir buffer bırak (5 dk)
-    //   const NOW = Date.now();
-    //   const ONE_HOUR = 60 * 60 * 1000;
-    //   const SAFETY_BUFFER = 5 * 60 * 1000; // 5 dakika buffer
-    //   const DEFAULT_EXPIRES_AT = NOW + (ONE_HOUR - SAFETY_BUFFER);
-
-    //   for (const [conversationId, items] of Object.entries(data)) {
-    //     const files = (items || [])
-    //       .filter(
-    //         (it) =>
-    //           it &&
-    //           it.media_key &&
-    //           (it.type === "avatar" || it.type === "conversation-avatar")
-    //       )
-    //       .map((it) => ({
-    //         media_key: it.media_key,
-    //         media_url: it.media_url,
-    //         type: it.type,
-    //         ownerUserId: it.ownerUserId,
-    //         sourceConvId: it.sourceConvId,
-    //         expiresAt: DEFAULT_EXPIRES_AT,
-    //       }));
-
-    //     if (files.length > 0) {
-    //       //console.log("avatar güncellendi.");
-    //       dispatch(upsertFiles({ conversationId, files }));
-    //     }
-    //   }
-    // };
-    // // 🔧 DÜZELTİLEN KISIM
-
-    const handleStatusUpdate = ({
-      messageId,
-      messageIds,
-      conversationId,
-      action,
-      by,
-      at,
-    }) => {
-      const conv = activeConvRef.current;
-      // Sunucu 'status' gönderiyor ("delivered" | "read")
-      const ids = messageId ? [messageId] : messageIds || [];
-      if (ids.length === 0) return;
-      //console.log("mesaj değişmeli: ", ids);
-      dispatch(
-        applyMessageAck({
-          conversationId: conversationId || conv?._id, // yoksa aktif sohbete yaz
-          messageIds: ids,
-          actionType: action, // <- action yerine status kullan
-          by,
-          at: at || Date.now(), // sunucu at göndermediyse şimdi
-        })
-      );
-    };
-
-    const handleUpdatedAvatars = ({ updates }) => {
-      //console.log("updates: ", updates);
-      // updates: [{ type, conversationId, avatar }, { type, conversationId, userId, avatar }]
-      dispatch(updateConversationAvatars(updates));
-    };
-
-    socket.on("messageList", handleMessageList);
-    socket.on("pre-urls", handlePreUrls);
-    socket.on("conversation-avatars-updated", handleUpdatedAvatars);
-    //socket.on("pre-avatars", handleAvatarPreUrls);
-
-    // socket.on("pre-bgImages", handleBgPreUrls);
-    socket.on("message:status-update", handleStatusUpdate);
-
-    return () => {
-      socket.off("messageList", handleMessageList);
-      socket.off("pre-urls", handlePreUrls);
-      //socket.off("pre-avatars", handleAvatarPreUrls);
-      // socket.off("pre-bgImages", handleBgPreUrls);
-      socket.off("conversation-avatars-updated", handleUpdatedAvatars);
-      socket.off("message:status-update", handleStatusUpdate);
-    };
-    // aktif konuşma değişirse fallback convId güncel kalsın:
-  }, [socket]);
 
   // === Konuşma değişince mesajları getir ===
   useEffect(() => {
@@ -376,152 +222,6 @@ const Chat = () => {
     }
   }, [socket, activeConversation?._id]); //ConvMessages
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleChatlistUpdate = (r) => {
-      const currentActive = activeConvRef.current; // 👈 ref'ten al
-      const convId = r.data._id;
-      const isActiveConv = String(convId) === String(currentActive?._id);
-      const panelAtBottom = isActiveConv
-        ? selectAtBottom(store.getState(), currentActive?._id)
-        : false;
-      const isTabVisible = document.visibilityState === "visible";
-      const isFromOther = r.data?.last_message?.sender?._id !== userId;
-      const myUnread = r.data?.members.find((m) => m.user._id === userId);
-
-      dispatch(addOrUpdateConversations([r.data]));
-      console.log(!r.data?.last_message, r.data?.last_message);
-      if (
-        !r.data?.last_message?._id ||
-        (isFromOther &&
-          (!isActiveConv || !panelAtBottom || !isTabVisible) &&
-          r.data.last_message?.message?._id !== undefined)
-      ) {
-        dispatch(setUnread({ conversationId: convId, by: myUnread.unread }));
-      }
-      if (isFromOther) {
-        // panelAtBottom && isTabVisible && eski if içerideydi burası
-        console.log("socketa bildirildi.");
-        socket.emit("message:delivered", {
-          messageId: r?.data?.last_message?.message?._id,
-          conversationId: r?.data?._id,
-          userId,
-        });
-      }
-      if (r.message === "send-message") {
-        playNotificationSound();
-      }
-      if (r.message === "group-created") {
-        console.log(r.data);
-        showNotification(
-          `🔔${r.data.createdBy.username} sizi "${r.data.name}" grubuna ekledi.`
-        );
-      }
-    };
-
-    socket.on("chatList:update", handleChatlistUpdate);
-
-    return () => {
-      socket.off("chatList:update", handleChatlistUpdate);
-    };
-  }, [socket, dispatch, userId, showNotification]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    // 📥 Biri arama başlattı → modal aç
-    socket.on(
-      "call:incoming",
-      ({ callId, conversationId, from, type, callType }) => {
-        setIncomingCall({
-          callId,
-          conversationId,
-          from,
-          type, // "group" | "private"
-          callType, // "video" | "audio"
-        });
-      }
-    );
-
-    socket.on("call:accepted", ({ callId, by }) => {
-      if (outgoingCall && outgoingCall.callId === callId) {
-        console.log("karşı taraf kabul etti.", { callId, by });
-        socket.emit(
-          "call:create-or-join",
-          {
-            conversationId: outgoingCall.conversationId, // bunu setOutgoingCall içinde saklamalısın
-            userId: user._id,
-            callType: "video",
-            conversationType: "private",
-            peers: [outgoingCall.peerId, user._id],
-          },
-          (res) => {
-            console.log("giriş yapılıyor.", res);
-            if (res.success && res.callId) {
-              navigate(`/call/${res.callId}`, {
-                state: { callerId: user._id },
-              });
-              setOutgoingCall(null);
-            }
-          }
-        );
-      }
-    });
-
-    socket.on("call:rejected", ({ callId, by }) => {
-      if (outgoingCall && outgoingCall.callId === callId) {
-        showNotification(`📴 Kullanıcı ${by} aramayı reddetti.`);
-        setOutgoingCall(null);
-      }
-    });
-
-    socket.on("call:participants", ({ callId, participants }) => {
-      console.log("📡 call:participants", callId, participants);
-      dispatch(setParticipants({ callId, participants }));
-    });
-
-    // 🔹 2) Bir kullanıcı odaya katıldı (call içindekilere)
-    socket.on("call:user-joined", ({ userId, callId }) => {
-      console.log("📡 call:user-joined", userId);
-      dispatch(userJoined({ callId, userId }));
-    });
-
-    // 🔹 3) Bir kullanıcı odadan ayrıldı (call içindekilere)
-    socket.on("call:user-left", ({ userId, callId }) => {
-      console.log("📡 call:user-left", userId);
-      dispatch(userLeft({ callId, userId }));
-    });
-
-    socket.on(
-      "call:update",
-      ({ action, triggerUserId, conversationId, active_call }) => {
-        console.log("📞 call:update geldi", {
-          action,
-          conversationId,
-          active_call,
-        });
-        dispatch(
-          updateConversationCall({
-            conversationId,
-            active_call,
-            action,
-            triggerUserId,
-          })
-        );
-      }
-    );
-
-    return () => {
-      socket.off("call:incoming");
-      socket.off("call:accepted");
-      socket.off("call:rejected");
-      socket.off("call:participants");
-      socket.off("call:user-joined");
-      socket.off("call:user-left");
-    };
-  }, [socket, outgoingCall, user, navigate]);
-
   // ————————————————— UI —————————————————
 
   const handleOption1Click = useCallback(() => {
@@ -542,8 +242,8 @@ const Chat = () => {
 
   const handleSettings = useCallback(() => {
     setActivePage("profileSettings");
-    setactiveConversationId(null);
-  }, [setactiveConversationId]);
+    setActiveConversation(null);
+  }, [setActiveConversation]);
 
   if (!ready) return <AppLoader progress={progress} />;
   return (
@@ -638,7 +338,7 @@ const Chat = () => {
         {activePage === "chatList" ? (
           <ChatPanel
             socket={socket}
-            fetchingNew={fetchingNewRef.current} // 👈 yeni mesaj animasyonu için
+            fetchingNew={fetchingNewRef.current}
             isOnline={isConnected}
             setOutgoingCall={setOutgoingCall}
           />
@@ -654,12 +354,11 @@ const Chat = () => {
                 conversationId: incomingCall.conversationId,
                 userId: user._id,
                 callType: incomingCall.callType,
-                conversationType: incomingCall.type, // "private"
+                conversationType: incomingCall.type,
                 peers: [incomingCall.from, user._id],
               },
               (res) => {
                 if (res.success && res.callId) {
-                  // ✅ Caller’a “accepted” bildir
                   socket.emit("call:accept", {
                     callId: res.callId,
                     userId: user._id,
@@ -673,7 +372,7 @@ const Chat = () => {
                 } else {
                   alert("Aramaya katılım başarısız oldu");
                 }
-              }
+              },
             );
           }}
           onReject={() => {

@@ -35,11 +35,11 @@ export default function FriendRequests({ socket }) {
     setSending(true);
     socket.emit(
       "friends:send-request",
-      { fromUserId: user._id, phone: `+${phoneRaw}` }, // ✅ rakamlı ham değer (örn 9054...)
+      { fromUserId: user._id, phone: `+${phoneRaw}` },
       (resp) => {
         setSending(false);
         showNotification(resp?.message || "Hata");
-      }
+      },
     );
   };
 

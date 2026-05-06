@@ -187,7 +187,7 @@ const messageSlice = createSlice({
   name: "messages",
   initialState,
   reducers: {
-    /** ✅ Mesajları upsert et (append veya prepend) */
+
     addOrUpdateMessages(state, action) {
       const { conversationId, messages = [], direction = "append" } =
         action.payload || {};
@@ -221,7 +221,7 @@ const messageSlice = createSlice({
       }
     },
 
-    /** ✅ Optimistic message (append only) */
+
     addOptimisticMessage(state, action) {
       const { conversationId, message } = action.payload || {};
       if (!conversationId || !message) return;
@@ -233,7 +233,7 @@ const messageSlice = createSlice({
       }
     },
 
-    /** ✅ Replace temp message after ACK (tempId → real msg) */
+
     replaceTempMessage(state, action) {
       const { conversationId, tempId, message } = action.payload || {};
       if (!conversationId || !tempId || !message) return;
@@ -252,7 +252,7 @@ const messageSlice = createSlice({
       }
     },
 
-    /** ✅ Delivered / Read status update (O(1) lookup) */
+
     applyMessageAck(state, action) {
       const { conversationId, messageIds = [], actionType, by, at } =
         action.payload || {};
@@ -301,7 +301,7 @@ const messageSlice = createSlice({
       }
     },
 
-    /** ✅ Reset all messages */
+
     resetMessages() {
       return initialState;
     },

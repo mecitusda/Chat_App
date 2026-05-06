@@ -33,7 +33,7 @@ export default function BackgroundSetting({ showNotification }) {
   const [visibleCount, setVisibleCount] = useState(5);
   const observerRef = useRef();
 
-  // ✅ geçici seçimler (önizleme)
+  // geçici seçimler (önizleme)
   const [tempBg, setTempBg] = useState(currentImageUrl);
   const [tempColor, setTempColor] = useState(currentColor);
 
@@ -50,10 +50,10 @@ export default function BackgroundSetting({ showNotification }) {
 
       if (node) observerRef.current.observe(node);
     },
-    [loading, visibleCount]
+    [loading, visibleCount],
   );
 
-  // ✅ sadece seçimi değiştir (henüz kaydetme)
+  // sadece seçimi değiştir (henüz kaydetme)
   const handleSelectImage = (bgFilename) => {
     const fullImageUrl = `/backgrounds/${bgFilename}`;
     setTempBg(fullImageUrl);
@@ -66,7 +66,7 @@ export default function BackgroundSetting({ showNotification }) {
     setTempBg(null);
   };
 
-  // ✅ kaydet (tek endpoint)
+  //kaydet (tek endpoint)
   const handleApply = async () => {
     try {
       setLoading(true);
@@ -77,7 +77,7 @@ export default function BackgroundSetting({ showNotification }) {
           chatBgImage: tempBg,
           chatBgColor: tempBg ? null : tempColor,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       if (res.data.success) {
@@ -103,7 +103,7 @@ export default function BackgroundSetting({ showNotification }) {
     <div className="bg-setting">
       <h3>Arka Plan Ayarı</h3>
 
-      {/* ✅ önizleme */}
+      {/* önizleme */}
       <div
         className="bg-preview"
         onClick={() => setShowList(true)}
@@ -114,7 +114,7 @@ export default function BackgroundSetting({ showNotification }) {
         title="Arka planı değiştirmek için tıklayın"
       />
 
-      {/* ✅ modal */}
+      {/* modal */}
       {showList && (
         <div className="bg-overlay">
           <div className="bg-modal">
@@ -133,7 +133,7 @@ export default function BackgroundSetting({ showNotification }) {
                 const isLast = index === visibleCount - 1;
                 const thumbPath = `/backgrounds/thumbs/${bg}`;
                 const fullPath = `/backgrounds/${bg}`;
-                const isSelected = tempBg === fullPath; // ✅ seçili kontrolü
+                const isSelected = tempBg === fullPath; // seçili kontrolü
                 return (
                   <LazyImage
                     key={bg}

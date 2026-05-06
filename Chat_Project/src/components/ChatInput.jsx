@@ -3,6 +3,8 @@ import axios from "axios";
 import PlusMenu from "./PlusMenu";
 
 import { EmojiPicker } from "./EmojiPickerComponent";
+import { useOutletContext } from "react-router";
+import { useUser } from "../contextAPI/UserContext";
 /**
  * props:
  * - socket
@@ -13,13 +15,10 @@ import { EmojiPicker } from "./EmojiPickerComponent";
  * - onOptimisticMessage(tempMsg)
  * - onAckReplace(tempId, serverMsg)
  * - onAckStatus(tempId, status)
- * - activeConversation, setActiveConversation, setactiveConversationId
+ * - activeConversation, setActiveConversation
  */
 export default function ChatInput({
   socket,
-  conversationId,
-  conversation,
-  userId,
   isOnline,
   onOptimisticMessage,
   addoutboxRef,
@@ -28,10 +27,9 @@ export default function ChatInput({
   file,
   setFile,
   setFilePreviewUrl,
-  activeConversation,
-  setActiveConversation,
-  setactiveConversationId,
 }) {
+  const { activeConversation, setActiveConversation } = useOutletContext();
+  const { user } = useUser();
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef(null);
@@ -68,19 +66,27 @@ export default function ChatInput({
   }, [showPicker]);
 
   const startTyping = () => {
-    if (!socket || !isOnline || !conversationId || !userId) return;
+    if (!socket || !isOnline || !activeConversation?._id || !user?._id) return;
     if (!typingRef.current) {
       typingRef.current = true;
-      socket.emit("typing", { conversationId, userId, isTyping: true });
+      socket.emit("typing", {
+        conversationId: activeConversation?._id,
+        userId: user?._id,
+        isTyping: true,
+      });
       lastSentAtRef.current = Date.now();
     }
   };
 
   const stopTyping = () => {
-    if (!socket || !conversationId || !userId) return;
+    if (!socket || !activeConversation?._id || !user?._id) return;
     if (!typingRef.current) return;
     typingRef.current = false;
-    socket.emit("typing", { conversationId, userId, isTyping: false });
+    socket.emit("typing", {
+      conversationId: activeConversation?._id,
+      userId: user?._id,
+      isTyping: false,
+    });
   };
 
   const notifyTyping = () => {
@@ -100,18 +106,23 @@ export default function ChatInput({
   // heartbeat
   useEffect(() => {
     hbTimerRef.current = setInterval(() => {
-      if (!socket || !isOnline || !conversationId || !userId) return;
+      if (!socket || !isOnline || !activeConversation?._id || !user?._id)
+        return;
       if (
         typingRef.current &&
         Date.now() - lastSentAtRef.current >= TYPING_HEARTBEAT_MS
       ) {
-        socket.emit("typing", { conversationId, userId, isTyping: true });
+        socket.emit("typing", {
+          conversationId: activeConversation?._id,
+          userId: user?._id,
+          isTyping: true,
+        });
         lastSentAtRef.current = Date.now();
       }
     }, 800);
 
     return () => clearInterval(hbTimerRef.current);
-  }, [socket, conversationId, userId, isOnline]);
+  }, [socket, activeConversation?._id, user?._id, isOnline]);
 
   // dosya preview
   useEffect(() => {
@@ -155,25 +166,25 @@ export default function ChatInput({
 
   // gönderme
   async function handleSend() {
-    if (!userId) return;
+    if (!user?._id) return;
     if (!text.trim() && !file) return;
 
     setSending(true);
     const tempId = makeTempId();
 
     try {
-      let convId = conversationId;
+      let convId = activeConversation?._id;
 
       // 📌 Private pending ise → önce sohbet oluştur
       if (activeConversation?.isPending) {
         const friendId = activeConversation.members.find(
-          (m) => m.user._id !== userId
+          (m) => m.user._id !== user?._id
         ).user._id;
 
         const resp = await new Promise((resolve) => {
           socket.emit(
             "conversation:create-private",
-            { userId, friendId },
+            { userId: user?._id, friendId },
             (res) => resolve(res)
           );
         });
@@ -184,7 +195,6 @@ export default function ChatInput({
         }
 
         setActiveConversation(resp.conversation);
-        setactiveConversationId(resp.conversation._id);
         convId = resp.conversation._id;
       }
 
@@ -198,7 +208,7 @@ export default function ChatInput({
         _id: tempId,
         conversation: convId,
         clientId: tempId,
-        sender: userId,
+        sender: user?._id,
         type: media
           ? media.mime.startsWith("image/")
             ? "image"
@@ -226,7 +236,7 @@ export default function ChatInput({
           "send-message",
           {
             conversationId: convId,
-            sender: userId,
+            sender: user?._id,
             type: optimistic.type,
             text: optimistic.text,
             media_key: optimistic.media_key,
@@ -249,7 +259,7 @@ export default function ChatInput({
       }
     } catch (err) {
       console.error("send error:", err);
-      onAckStatus?.(conversationId, tempId, "failed");
+      onAckStatus?.(activeConversation?._id, tempId, "failed");
       setSending(false);
     } finally {
       setText("");
@@ -270,7 +280,7 @@ export default function ChatInput({
 
   return (
     <>
-      {conversation && (
+      {activeConversation && (
         <div className="chat__input-area">
           <div
             ref={pickerWrapperRef}

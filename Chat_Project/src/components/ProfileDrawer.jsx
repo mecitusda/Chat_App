@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import React, { useCallback, useMemo, useState } from "react";
+import { shallowEqual, useDispatch, useSelector } from "react-redux";
 import { addOrUpdateConversations } from "../slices/conversationSlice";
 import axios from "axios";
 import { useEffect } from "react";
@@ -9,12 +9,62 @@ import AddMemberModal from "./AddMemberModal";
 import formatPhone from "../utils/formatPhone";
 import AllMembersModal from "./AllMembersModal";
 
+function classifyType({ msgType, mime, url }) {
+  const t = (msgType || "").toLowerCase();
+  const m = (mime || "").toLowerCase();
+  const ext = extFromUrl(url);
+
+  if (t === "image") return "image";
+  if (t === "video") return "video";
+  if (t === "audio") return "audio";
+  if (t === "file" || t === "document") return "document";
+  if (t && t !== "text") return t;
+
+  if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
+  if (m) return "document";
+
+  const imgExt = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "svg", "avif"];
+  const vidExt = ["mp4", "webm", "mov", "m4v", "ogg", "ogv"];
+  const audExt = ["mp3", "wav", "ogg", "m4a", "aac", "flac"];
+  const docExt = [
+    "pdf",
+    "doc",
+    "docx",
+    "ppt",
+    "pptx",
+    "xls",
+    "xlsx",
+    "csv",
+    "txt",
+    "zip",
+    "rar",
+    "7z",
+  ];
+
+  if (imgExt.includes(ext)) return "image";
+  if (vidExt.includes(ext)) return "video";
+  if (audExt.includes(ext)) return "audio";
+  if (docExt.includes(ext)) return "document";
+  return "unknown";
+}
+
+function extFromUrl(url = "") {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    const m = path.match(/\.([a-z0-9]+)(?:\?|#|$)/i);
+    return m ? m[1] : "";
+  } catch {
+    const m = (url || "").toLowerCase().match(/\.([a-z0-9]+)(?:\?|#|$)/i);
+    return m ? m[1] : "";
+  }
+}
+
 export default function ProfileDrawer({
   onClose,
-  conversation,
   meId,
-  mediaThumbs = [], // küçük grid için src[]
-  allMedia = [], // [{src, type?, alt?}]
   onOpenLightbox, // (startIndex:number) => void (GLOBAL)
   onBlock,
   onReport,
@@ -22,39 +72,53 @@ export default function ProfileDrawer({
   avatar,
   socket,
 }) {
-  const { showNotification } = useOutletContext();
+  const {
+    showNotification,
+    activeProfile,
+    setActiveProfile,
+    setActiveConversation,
+  } = useOutletContext();
   const [animateState, setAnimateState] = useState("closed");
-  const isGroup = conversation?.type === "group";
+  const isGroup = activeProfile?.type === "group";
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [adding, setAdding] = useState(false);
-  const friends = useSelector((s) => s.friends.friends || []);
+  const fileS = useSelector((s) => s.files?.byKey, shallowEqual);
   const dispatch = useDispatch();
+  const convMessages = useSelector(
+    (state) =>
+      activeProfile?._id
+        ? state.messages?.byConversation[activeProfile._id] || []
+        : EMPTY_MESSAGES,
+    shallowEqual,
+  );
+
+  //console.log(conversation);
   const isAdmin = useMemo(() => {
-    return isGroup && String(conversation?.createdBy?._id) === String(meId);
-  }, [isGroup, conversation, meId]);
+    return isGroup && String(activeProfile?.createdBy?._id) === String(meId);
+  }, [isGroup, activeProfile, meId]);
 
   const [view, setView] = useState("info"); // "info" | "media"
-  const [newName, setNewName] = useState(conversation?.name || "");
+  const [newName, setNewName] = useState(activeProfile?.name || "");
 
-  const [uploading, setUploading] = useState(false); // ✅ spinner state
+  const [uploading, setUploading] = useState(false); // spinner state
 
   const peer = useMemo(() => {
     if (isGroup) return null;
-    const a = conversation?.members?.[0];
-    const b = conversation?.members?.[1];
+    const a = activeProfile?.members?.[0];
+    const b = activeProfile?.members?.[1];
     if (!a || !b) return null;
     const mine = String(a?.user?._id) === String(meId) ? a : b;
     const other = mine === a ? b : a;
     return other?.user || null;
-  }, [conversation, isGroup, meId]);
+  }, [activeProfile, isGroup, meId]);
 
   const display = useMemo(() => {
     if (isGroup) {
       return {
-        name: conversation?.name || "Grup",
+        name: activeProfile?.name || "Grup",
         phone: "",
-        about: conversation?.about || "",
+        about: activeProfile?.about || "",
       };
     }
     return {
@@ -62,12 +126,51 @@ export default function ProfileDrawer({
       phone: peer?.phone || "",
       about: peer?.about || "",
     };
-  }, [peer, conversation, isGroup]);
+  }, [peer, activeProfile, isGroup]);
 
-  const openBySrc = (src) => {
-    const idx = allMedia.findIndex((m) => m.src === src);
-    onOpenLightbox?.(idx >= 0 ? idx : 0);
-  };
+  const galleryItems = React.useMemo(() => {
+    if (!activeProfile?._id) return [];
+    return (convMessages || [])
+      .map((m) => {
+        if (m.type === "text" || !m._id) return null;
+
+        // fileS store’dan messageId ile media_url al
+        const file = fileS?.[activeProfile._id]?.[m._id];
+        if (!file?.media_url) return null;
+
+        const mediaType = classifyType({
+          msgType: m.type,
+          mime: m.mimetype,
+          url: file.media_url,
+        });
+
+        if (mediaType === "image" || mediaType === "video") {
+          return {
+            src: file.media_url,
+            type: mediaType,
+            alt: "media",
+            caption: m.text || "",
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  }, [onClose]);
+
+  const mediaThumbs = useMemo(() => {
+    return galleryItems
+      .filter((i) => i.type === "image" || i.type === "video")
+      .slice(0, 9);
+  }, [galleryItems]);
+
+  const openBySrc = useCallback(
+    (src) => {
+      const idx = galleryItems.findIndex((m) => m.src === src);
+      onOpenLightbox?.(idx >= 0 ? idx : 0);
+    },
+    [galleryItems, onOpenLightbox],
+  );
 
   const handleAvatarChange = async (file) => {
     try {
@@ -75,7 +178,7 @@ export default function ProfileDrawer({
       // 1) presigned-url al
       const { data } = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/file/presigned-url/group`,
-        { params: { fileType: file.type } }
+        { params: { fileType: file.type } },
       );
 
       const { uploadUrl, key } = data;
@@ -89,7 +192,7 @@ export default function ProfileDrawer({
       socket.emit(
         "conversation:update",
         {
-          conversationId: conversation._id,
+          conversationId: activeProfile._id,
           userId: meId,
           avatarKey: key,
         },
@@ -100,7 +203,7 @@ export default function ProfileDrawer({
             console.error("❌ Avatar update failed:", res.message);
           }
           setUploading(false);
-        }
+        },
       );
     } catch (err) {
       setUploading(false);
@@ -119,20 +222,19 @@ export default function ProfileDrawer({
     }, 350); // CSS’teki transition süresiyle eşit olmalı
   };
 
-  // ✅ Grup adı güncelleme handler
   const handleNameChange = async () => {
     if (!newName) {
       showNotification("❌ Lütfen bir grup adı giriniz.");
       return;
     }
-    if (newName === conversation?.name) {
+    if (newName === activeProfile?.name) {
       showNotification("❌ Lütfen farklı bir grup adı giriniz.");
       return;
     }
     socket.emit(
       "conversation:update",
       {
-        conversationId: conversation._id,
+        conversationId: activeProfile._id,
         userId: meId,
         name: newName,
       },
@@ -140,10 +242,15 @@ export default function ProfileDrawer({
         if (res.success) {
           showNotification("✅ Grup adı başarıyla değiştirildi.");
           dispatch(addOrUpdateConversations([res.conversation]));
+          if (res.conversation._id === activeProfile._id) {
+            console.log("değişti", res.conversation);
+            setActiveProfile(res.conversation);
+            setActiveConversation(res.conversation);
+          }
         } else {
           showNotification("❌ Grup adı update failed:", res.message);
         }
-      }
+      },
     );
   };
 
@@ -154,7 +261,7 @@ export default function ProfileDrawer({
     socket.emit(
       "conversation:update",
       {
-        conversationId: conversation._id,
+        conversationId: activeProfile._id,
         userId: meId,
         addMembers: selectedFriends,
       },
@@ -168,17 +275,18 @@ export default function ProfileDrawer({
         } else {
           showNotification("❌ Üyeler eklenemedi.");
         }
-      }
+      },
     );
   };
+
   return (
     <div
       className={`profile-drawer  ${
         animateState === "opening"
           ? "is-open"
           : animateState === "closing"
-          ? "is-closing"
-          : ""
+            ? "is-closing"
+            : ""
       } ${view === "media" ? "is-media" : ""}`}
     >
       <div className="profile-drawer__overlay" onClick={handleClose} />
@@ -225,7 +333,7 @@ export default function ProfileDrawer({
                           type="file"
                           accept="image/*"
                           style={{ display: "none" }}
-                          disabled={uploading} // ✅ yüklenirken tıklama kapalı
+                          disabled={uploading}
                           onChange={(e) =>
                             e.target.files?.[0] &&
                             handleAvatarChange(e.target.files[0])
@@ -251,7 +359,7 @@ export default function ProfileDrawer({
                         src={avatar}
                         alt={newName}
                       />
-                      <div className="profile-drawer__name">{newName}</div>
+                      <div className="profile-drawer__name">{display.name}</div>
                       {display.phone && (
                         <div className="profile-drawer__phone">
                           {display.phone}
@@ -304,18 +412,17 @@ export default function ProfileDrawer({
                   </div>
                 </div>
                 {/* 👥 Grup Katılımcıları */}
-                {/* 👥 Grup Katılımcıları */}
                 {isGroup && (
                   <div className="profile-drawer__members">
                     <div
                       className="profile-drawer__section-title"
                       style={{ marginTop: 16 }}
                     >
-                      Katılımcılar ({conversation?.members?.length || 0})
+                      Katılımcılar ({activeProfile?.members?.length || 0})
                     </div>
 
                     <ul className="member_items">
-                      {/* ✅ ÜYE EKLE KUTUSU */}
+                      {/* ÜYE EKLE KUTUSU */}
                       {isAdmin && (
                         <li
                           className="member-item add-member"
@@ -330,11 +437,11 @@ export default function ProfileDrawer({
                         </li>
                       )}
 
-                      {/* ✅ İlk 7 üyeyi göster */}
-                      {conversation?.members?.slice(0, 7).map((m) => {
+                      {/* İlk 7 üyeyi göster */}
+                      {activeProfile?.members?.slice(0, 7).map((m) => {
                         const u = m?.user || {};
                         const isCreator =
-                          String(conversation?.createdBy?._id) ===
+                          String(activeProfile?.createdBy?._id) ===
                           String(u?._id);
 
                         return (
@@ -376,14 +483,14 @@ export default function ProfileDrawer({
                       })}
 
                       {/* 👇 7’den fazla varsa “Tümünü Gör” */}
-                      {conversation?.members?.length > 7 && (
+                      {activeProfile?.members?.length > 7 && (
                         <li
                           className="member-item view-all"
                           onClick={() => setView("members")}
                         >
                           <div className="member-info">
                             <div className="member-name">
-                              Tümünü Gör ({conversation.members.length})
+                              Tümünü Gör ({activeProfile.members.length})
                             </div>
                           </div>
                         </li>
@@ -431,9 +538,9 @@ export default function ProfileDrawer({
               </div>
 
               <div className="profile-drawer__media-body">
-                {allMedia.length ? (
+                {galleryItems.length ? (
                   <div className="profile-drawer__media-grid -lg">
-                    {allMedia.map((m, i) => (
+                    {galleryItems.map((m, i) => (
                       <button
                         key={`${m.src}_${i}`}
                         type="button"
@@ -458,7 +565,7 @@ export default function ProfileDrawer({
         <AddMemberModal
           show={showAddModal}
           onClose={() => setShowAddModal(false)}
-          conversation={conversation}
+          conversation={activeProfile}
           meId={meId}
           socket={socket}
           showNotification={showNotification}
@@ -469,7 +576,7 @@ export default function ProfileDrawer({
         <AllMembersModal
           show={view === "members"}
           onClose={() => setView("info")}
-          members={conversation?.members || []}
+          members={activeProfile?.members || []}
         />
       </aside>
     </div>

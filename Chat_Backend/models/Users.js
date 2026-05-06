@@ -46,18 +46,17 @@ UserSchema.methods.getAvatarUrl = async function () {
   }
 
   if (!this.avatar.key) return null; // avatar yok
-  // yeni presigned url üret
   const newUrl = await getSignedUrlFromStorage(this.avatar.key);
 
   this.avatar.url = newUrl;
-  this.avatar.url_expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 10 dk geçerli
+  this.avatar.url_expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
   await this.save();
   return {url:newUrl,url_expiresAt:this.avatar.url_expiresAt};
 };
 
 UserSchema.set("toJSON", {
   transform: function (doc, ret) {
-    // avatar bazen string olarak geliyor, güvenli hale getirelim
+
     if (!ret.avatar || typeof ret.avatar !== "object") {
       ret.avatar = {};
     }

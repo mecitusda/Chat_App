@@ -21,19 +21,19 @@ export function useFriends({socket, setProgress}) {
   useEffect(() => {
     if (!socket || !user?._id) return;
     setProgress(40)
-    // ✅ Arkadaş listesi
+
     socket.on("friends:list", (payload) => {
       setProgress(100)
       if (payload.success) dispatch(setFriends(payload.friends));
     });
 
-    // ✅ Gelen istekler
+
     socket.on("friends:requests:list", (payload) => {
       setProgress(80)
       if (payload.success) dispatch(setRequests(payload.requests));
     });
 
-    // ✅ Yeni istek geldi
+
     socket.on("friends:request:incoming", ({ fromUser }) => {
       if (fromUser) {
       dispatch(addRequest(fromUser));
@@ -41,7 +41,7 @@ export function useFriends({socket, setProgress}) {
       }
     });
 
-    // ✅ İstek kabul edildi
+
     socket.on("friends:request:accepted", ({ user }) => {
       if (user) {
         dispatch(addFriend(user));
@@ -49,7 +49,7 @@ export function useFriends({socket, setProgress}) {
       }
     });
 
-    // ✅ İstek reddedildi
+
     socket.on("friends:request:rejected", ({ username }) => {
       if (username){
         showNotification(`🔔${username} arkadaşlık isteğinizi reddetti.`)
@@ -57,7 +57,7 @@ export function useFriends({socket, setProgress}) {
       
     });
 
-    // ✅ Karşılıklı istek → otomatik kabul
+
     socket.on("friends:auto-accepted", ({ user }) => {
       if (user) {    
       dispatch(autoAccept({ user }));

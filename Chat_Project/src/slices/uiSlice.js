@@ -35,7 +35,7 @@ const uiSlice = createSlice({
   name: "ui",
   initialState,
   reducers: {
-    /** ✅ Sadece değer değiştiyse güncelle */
+
     setAtBottom(state, action) {
       const { conversationId, atBottom } = action.payload || {};
       if (!conversationId) return;
@@ -47,7 +47,6 @@ const uiSlice = createSlice({
       }
     },
 
-    /** ✅ Sadece mevcutsa temizle */
     resetAtBottom(state, action) {
       const { conversationId } = action.payload || {};
       if (!conversationId) return;
@@ -56,7 +55,7 @@ const uiSlice = createSlice({
       }
     },
 
-    /** ✅ Tümünü sıfırla */
+
     resetAllAtBottom() {
       return initialState;
     },
@@ -66,7 +65,7 @@ const uiSlice = createSlice({
 export const { setAtBottom, resetAtBottom, resetAllAtBottom } =
   uiSlice.actions;
 
-/** ✅ Memoized selector */
+
 export const selectAtBottom = (state, convId) =>
   !!state.ui.atBottomByConv[convId];
 

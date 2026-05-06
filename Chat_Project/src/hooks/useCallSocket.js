@@ -23,14 +23,14 @@ export function useCallSocket(SOCKET_URL, callId,conversationId) {
     socket.on("disconnect", () => setStatus("disconnected"));
 
 
-    // ✅ 2. Receive all participants
+
     socket.on("call:participants", ({ participants }) => {
       console.log("🧾 Participants:", participants);
       setParticipants(participants);
       setStatus(participants.length >= 2 ? "in-call" : "waiting");
     });
 
-    // ✅ 3. Someone joined
+
     socket.on("call:user-joined", ({ userId }) => {
       console.log("👤 User joined:", userId);
       setParticipants((prev) =>
@@ -38,13 +38,12 @@ export function useCallSocket(SOCKET_URL, callId,conversationId) {
       );
     });
 
-    // ✅ 4. Someone left
+
     socket.on("call:user-left", ({ userId }) => {
       console.log("👤 User left:", userId);
       setParticipants((prev) => prev.filter((p) => p !== userId));
     });
 
-    // ✅ 5. Ready (trigger WebRTC setup)
     socket.on("webrtc:peer-ready", ({ userId }) => {
       // You can trigger createOffer() here for this peer
     });
@@ -55,7 +54,6 @@ export function useCallSocket(SOCKET_URL, callId,conversationId) {
     };
   }, [SOCKET_URL, callId, user?._id,conversationId]);
 
-  // ✅ User manually leaves the call
   const leaveCall = useCallback(() => {
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("leave-call", {
@@ -67,7 +65,6 @@ export function useCallSocket(SOCKET_URL, callId,conversationId) {
     navigate("/chat", { replace: true });
   }, [user?._id, callId, navigate,conversationId]);
 
-  // ✅ User declares ready (after camera/mic open)
   const markReady = useCallback(() => {
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("webrtc:ready", {

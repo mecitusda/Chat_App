@@ -20,8 +20,9 @@ import Spinner from "./Spinner";
 import OnlineAvatar from "../components/OnlineAvatar";
 import { makeSelectPresence } from "../slices/presenceSlice";
 import { useOutletContext } from "react-router";
-// ==== helpers ====
-const MAX_SCAN_MSGS = 60; // içerik aramada taranacak mesaj sayısı (son N)
+import Fuse from "fuse.js";
+
+const MAX_SCAN_MSGS = 60;
 const norm = (s) => (s || "").toString().toLowerCase();
 const trimSpaces = (s) => (s || "").toString().trim();
 const EMPTY = [];
@@ -86,20 +87,19 @@ const ChatListItem = memo(function ChatListItem({
       ? conversation.members?.[1]?.user
       : conversation.members?.[0]?.user);
 
-  // ✅ her user için bir defalık selector oluştur
   const selectPresenceForUser = other?._id
     ? makeSelectPresence(other._id)
     : null;
 
   const presence = useSelector(
-    selectPresenceForUser ? selectPresenceForUser : () => null
+    selectPresenceForUser ? selectPresenceForUser : () => null,
   );
 
   const avatarUrl = isPrivate ? other?.avatar?.url : conversation.avatar?.url;
   const lastMsg = conversation.last_message;
 
   return (
-    <li className="chat__item" onClick={() => onSelect(conversation._id)}>
+    <li className="chat__item" onClick={() => onSelect(conversation)}>
       <OnlineAvatar
         src={avatarUrl || FALLBACK_AVATAR}
         alt={
@@ -130,7 +130,7 @@ const ChatListItem = memo(function ChatListItem({
       <div className="chat__time">
         <span>
           {formatSimpleTime(
-            lastMsg?.message?.updatedAt || lastMsg?.updatedAt || ""
+            lastMsg?.message?.updatedAt || lastMsg?.updatedAt || "",
           )}
         </span>
         <div
@@ -149,8 +149,8 @@ export default function ChatList({ status, socket, spinner }) {
   const {
     setActiveConversation,
     showNotification,
-    activeConversationId,
-    setactiveConversationId,
+    activeConversation,
+    setActiveProfile,
   } = useOutletContext();
   // search state
   const [query, setQuery] = useState("");
@@ -161,11 +161,11 @@ export default function ChatList({ status, socket, spinner }) {
   const [activeFilter, setActiveFilter] = useState("all"); // "all" | "unread" | "groups"
   const conversations = useSelector(
     (s) => s.conversations.list || [],
-    shallowEqual
+    shallowEqual,
   );
   const messagesByConv = useSelector(
     (s) => s.messages?.byConversation,
-    shallowEqual
+    shallowEqual,
   );
   // function formatMessagePreview(conversation) {
   //   if (!conversation?.last_message) return "";
@@ -203,7 +203,7 @@ export default function ChatList({ status, socket, spinner }) {
     } else {
       const mem = conversation?.members?.find((m) => m?.user?._id === senderId);
       const other = conversation?.members?.find(
-        (m) => m?.user?._id === senderId
+        (m) => m?.user?._id === senderId,
       );
       if (!mem) return { who: "", content: "" };
       who = user?._id === senderId ? "Sen " : other.user.username;
@@ -287,7 +287,7 @@ export default function ChatList({ status, socket, spinner }) {
       } else if (conv.type === "private") {
         // Private → karşı tarafın avatarını kontrol et
         const otherMember = conv.members.find(
-          (m) => String(m.user._id) !== String(user._id)
+          (m) => String(m.user._id) !== String(user._id),
         );
         if (
           otherMember?.user?.avatar?.url &&
@@ -303,7 +303,7 @@ export default function ChatList({ status, socket, spinner }) {
       }
     });
     if (expiredConvAvatars.length > 0) {
-      console.log("süresi dolanlar: ", expiredConvAvatars);
+      //console.log("süresi dolanlar: ", expiredConvAvatars);
       socket.emit("refresh-conversation-avatars", expiredConvAvatars);
     }
   }, [socket, conversations, user?._id]);
@@ -338,7 +338,7 @@ export default function ChatList({ status, socket, spinner }) {
       }
       return c.name || "Grup";
     },
-    [user?._id]
+    [user?._id],
   );
 
   const filteredFriends = useMemo(() => {
@@ -352,15 +352,15 @@ export default function ChatList({ status, socket, spinner }) {
       .map(
         (c) =>
           c.members.find((m) => String(m.user._id) !== String(user?._id))?.user
-            ._id
+            ._id,
       );
     return friends
       .filter(
         (f) =>
           f._id !== user?._id &&
-          !existingChatUserIds.includes(String(f._id)) && // ✅ zaten sohbeti olanları çıkar
+          !existingChatUserIds.includes(String(f._id)) &&
           (f.username.toLowerCase().includes(q) ||
-            f.phone?.toLowerCase().includes(q))
+            f.phone?.toLowerCase().includes(q)),
       )
       .map((f) => ({
         _id: `friend-${f._id}`,
@@ -368,34 +368,40 @@ export default function ChatList({ status, socket, spinner }) {
       }));
   }, [debounced, friends, conversations, user?._id, activeFilter]);
 
-  // içerik araması + snippet üretimi
-
-  // === Mesaj arama ===
-  const filteredMessages = useMemo(() => {
-    if (debounced === "") return;
-    const q = trimSpaces(debounced).toLowerCase();
-    if (!q) return [];
-
-    const results = [];
+  const messageFuse = useMemo(() => {
+    const allMessages = [];
 
     for (const c of conversations) {
-      // 🔎 filtreye uymuyorsa geç
+      // Filtreye uymuyorsa geç
       if (activeFilter === "unread" && c.unread === 0) continue;
       if (activeFilter === "groups" && c.type !== "group") continue;
 
       const msgs = (messagesByConv[c._id] || EMPTY).slice(-MAX_SCAN_MSGS);
-      for (const m of msgs) {
-        if (m?.text && m?.text.toLowerCase().includes(q)) {
-          results.push({ conv: c, msg: m });
+      msgs.forEach((m) => {
+        if (m?.text) {
+          allMessages.push({ conv: c, msg: m });
         }
-      }
+      });
     }
 
-    return results;
-  }, [debounced, conversations, messagesByConv, activeFilter]);
+    return new Fuse(allMessages, {
+      keys: ["msg.text"],
+      threshold: 0.3,
+      ignoreLocation: true,
+      minMatchCharLength: 2,
+    });
+  }, [conversations, messagesByConv, activeFilter]);
+
+  const filteredMessages = useMemo(() => {
+    const q = trimSpaces(debounced);
+    if (!q) return [];
+
+    const results = messageFuse.search(q);
+    return results.map((r) => r.item);
+  }, [debounced, messageFuse]);
 
   const messageMatchedConvIds = new Set(
-    filteredMessages?.map((r) => r.conv._id)
+    filteredMessages?.map((r) => r.conv._id),
   );
 
   const filteredWithPreview = useMemo(() => {
@@ -440,9 +446,11 @@ export default function ChatList({ status, socket, spinner }) {
     return results;
   }, [debounced, conversations, getTitle, messageMatchedConvIds, activeFilter]);
   // === Seçim ===
-  const onSelectConversation = (id) => setactiveConversationId(id);
+  const onSelectConversation = (conv) => {
+    setActiveConversation(conv);
+    setActiveProfile(conv);
+  };
   const onSelectFriend = (friend) => {
-    setactiveConversationId(null); // daha yok
     setActiveConversation({
       _id: "_temp",
       type: "private",
@@ -450,11 +458,23 @@ export default function ChatList({ status, socket, spinner }) {
         { user: { _id: user._id, username: user.username } },
         { user: friend },
       ],
-      isPending: true, // ✅ sohbet henüz DB’de yok
+      isPending: true,
+    });
+    setActiveProfile({
+      _id: "_temp",
+      type: "private",
+      members: [
+        { user: { _id: user._id, username: user.username } },
+        { user: friend },
+      ],
+      isPending: true,
     });
   };
+
   return (
-    <div className={`chat__list ${!activeConversationId ? "is-visible" : ""}`}>
+    <div
+      className={`chat__list ${!activeConversation?._id ? "is-visible" : ""}`}
+    >
       <header className="list__header">
         <h2 className="list__title">Sohbetler</h2>
         {status === "connecting" || status === "reconnecting" ? (
@@ -584,7 +604,7 @@ export default function ChatList({ status, socket, spinner }) {
                     previewContent={previewContent}
                     query={query}
                   />
-                )
+                ),
               )}
             </ul>
           </div>
@@ -598,7 +618,7 @@ export default function ChatList({ status, socket, spinner }) {
                 <li
                   key={msg._id}
                   className="chat__item -message"
-                  onClick={() => onSelectConversation(conv._id)}
+                  onClick={() => onSelectConversation(conv)}
                 >
                   <div className="chat__info">
                     <h3 className="chat__name">
@@ -617,7 +637,7 @@ export default function ChatList({ status, socket, spinner }) {
 
                           if (conv.type === "group") {
                             const member = conv.members?.find(
-                              (m) => m?.user?._id === senderId
+                              (m) => m?.user?._id === senderId,
                             );
                             if (member) {
                               who =

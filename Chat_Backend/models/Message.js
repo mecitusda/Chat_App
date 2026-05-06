@@ -37,14 +37,13 @@ const MessageSchema = new mongoose.Schema({
   ]
 }, { timestamps: true, versionKey: false });
 
-// 🔎 Indexler
 MessageSchema.index({ conversation: 1, _id: 1 });
 MessageSchema.index({ conversation: 1, createdAt: 1 });
 MessageSchema.index({ conversation: 1, "deliveredTo.user": 1 });
 MessageSchema.index({ conversation: 1, "readBy.user": 1 });
 
 
-// ✅ Presigned url kontrol eden method
+
 MessageSchema.methods.getMediaUrl = async function () {
   const now = new Date();
   if (this.media_url && this.media_url_expiresAt && this.media_url_expiresAt > now) {
@@ -63,10 +62,10 @@ MessageSchema.methods.getMediaUrl = async function () {
 };
 
 
-// ✅ JSON’a dönüştürülürken otomatik media_url ekle
+
 MessageSchema.set("toJSON", {
   transform: function (doc, ret) {
-    delete ret.media_key;          // frontend görmesin
+    delete ret.media_key;         
     return ret;
   }
 });

@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { FaChevronUp, FaChevronDown } from "react-icons/fa";
 import { MdClose } from "react-icons/md";
@@ -18,6 +18,17 @@ const SearchInput = forwardRef(
     inputRef
   ) => {
     if (typeof document === "undefined") return null;
+    console.log("render");
+    // Portal hedefini sabitle
+    const portalTarget = useMemo(() => {
+      let el = document.getElementById("search-portal-root");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "search-portal-root";
+        document.body.appendChild(el);
+      }
+      return el;
+    }, []);
 
     return ReactDOM.createPortal(
       <div
@@ -64,9 +75,16 @@ const SearchInput = forwardRef(
           </button>
         </div>
       </div>,
-      document.body // 👈 Portal hedefi
+      portalTarget // 👈 Sabit hedef
     );
   }
 );
 
-export default SearchInput;
+export default React.memo(SearchInput, (prev, next) => {
+  return (
+    prev.isSearching === next.isSearching &&
+    prev.searchQuery === next.searchQuery &&
+    prev.searchCount === next.searchCount &&
+    prev.searchIndex === next.searchIndex
+  );
+});

@@ -1,15 +1,21 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import ChatHeader from "./ChatPanel_Header";
 import { FiLoader, FiCheck } from "react-icons/fi";
 import { FaCheckDouble } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import { createSelector } from "@reduxjs/toolkit";
 import { computeEffectiveStatus } from "../helpers/effectiveStatus";
 import {
   selectHasMore,
   selectOldestMessageId,
 } from "../slices/paginationSlice";
 import MediaLightbox from "./MediaLightbox";
-import { shallowEqual } from "react-redux";
 import ChatInput from "./ChatInput";
 import {
   addOptimisticMessage,
@@ -22,10 +28,13 @@ import { setAtBottom } from "../slices/uiSlice";
 import { upsertFiles } from "../slices/fileSlice";
 import ProfileDrawer from "../components/ProfileDrawer";
 import { useUser } from "../contextAPI/UserContext";
-import { useInView } from "react-intersection-observer";
 import Avatar from "@mui/material/Avatar";
 import { RiCheckDoubleFill } from "react-icons/ri";
 import { useOutletContext } from "react-router";
+
+import { debounce } from "lodash-es";
+import { Virtuoso } from "react-virtuoso";
+
 /* ------ Mesaj durum ikonu (aggregate) ------ */
 function getStatusIconByStatus(status) {
   switch (status) {
@@ -123,19 +132,17 @@ function filenameFromUrl(url = "") {
   }
 }
 
-// en alta yakın mı?
 function isNearBottom(el, px = 40) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= px;
 }
 
-// okunduya işaretlenecek (benim göndermediğim ve HENÜZ ben okumamışsam)
 function collectUnseen(convMessages, meId) {
   return (convMessages || [])
     .filter((m) => String(m?.sender?._id || m?.sender) !== String(meId))
     .filter((m) => {
       const readBy = Array.isArray(m.readBy) ? m.readBy : [];
       const meRead = readBy.some(
-        (x) => String(x?.user?._id ?? x?.user) === String(meId)
+        (x) => String(x?.user?._id ?? x?.user) === String(meId),
       );
       return !meRead;
     })
@@ -150,9 +157,9 @@ function getHeaderAvatarKey(conversation, selfId) {
     const other = meFirst
       ? conversation?.members?.[1]?.user
       : conversation?.members?.[0]?.user;
-    return other?.avatar?.url; // media_key
+    return other?.avatar?.url;
   }
-  return conversation?.avatar.url; // group media_key
+  return conversation?.avatar.url;
 }
 
 function formatDateDivider(dateStr) {
@@ -177,13 +184,11 @@ function formatDateDivider(dateStr) {
   });
 }
 
-// 🔥 Advanced render guard versiyonu
 const VisibleMessage = React.memo(
   function VisibleMessage({
     msg,
     index,
     isMe,
-    onVisible,
     renderMessageMedia,
     computeStatus,
     isCurrentMatch,
@@ -191,7 +196,6 @@ const VisibleMessage = React.memo(
     isAvatar,
     isName,
   }) {
-    const { ref, inView } = useInView({ threshold: 0.7, triggerOnce: true });
     const metaRef = useRef(null);
     const [metaWidth, setMetaWidth] = useState(0);
 
@@ -211,22 +215,17 @@ const VisibleMessage = React.memo(
       return () => observer.disconnect();
     }, []);
 
-    // görünürse okunduya ekle
-    useEffect(() => {
-      if (inView && !isMe && msg?._id) onVisible(msg._id);
-    }, [inView, isMe, msg?._id, onVisible]);
-
     const hasMedia = msg.type !== "text" && msg.media_url;
 
     return (
       <div
-        ref={ref}
         className={`message message--${isMe ? "outgoing" : "incoming"} ${
           isCurrentMatch ? "message--highlight" : ""
         } ${isName && !isMe ? "mb-06" : ""} ${
           msg.type !== "text" ? "mw-40" : ""
         }`}
         data-msg-index={index}
+        data-msg-id={msg._id}
       >
         {/* Avatar (sadece gelen mesajlarda ve grupsa) */}
         {!isMe && isAvatar && (
@@ -264,9 +263,7 @@ const VisibleMessage = React.memo(
     );
   },
 
-  // 🧠 advanced comparison function
   (prev, next) => {
-    // ⚡ sadece önemli alanlardan hafif bir "key" oluştur
     const prevKey =
       prev.msg._id +
       prev.msg.text +
@@ -289,14 +286,18 @@ const VisibleMessage = React.memo(
       prev.isAvatar === next.isAvatar &&
       prev.isName === next.isName
     );
-  }
+  },
 );
 
 const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
   const renderCountRef = useRef(0);
   renderCountRef.current++;
-  const { activeConversation, setActiveConversation, setactiveConversationId } =
-    useOutletContext();
+  const {
+    activeConversation,
+    setActiveConversation,
+    activeProfile,
+    setActiveProfile,
+  } = useOutletContext();
   //console.log("messages: ", messages);
   const { user, setUser } = useUser();
   const convId = activeConversation?._id;
@@ -305,10 +306,10 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
   const listRef = useRef(null);
 
   const hasMoreOlder = useSelector((s) =>
-    convId ? selectHasMore(s, convId) : true
+    convId ? selectHasMore(s, convId) : true,
   );
   const oldestId = useSelector((s) =>
-    convId ? selectOldestMessageId(s, convId) : null
+    convId ? selectOldestMessageId(s, convId) : null,
   );
 
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -322,18 +323,23 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
   const fileS = useSelector((s) => s.files?.byKey, shallowEqual);
   const EMPTY_MESSAGES = React.useMemo(() => [], []);
 
-  const convMessages = useSelector(
-    (state) =>
-      activeConversation?._id
-        ? state.messages?.byConversation[activeConversation._id] || []
-        : EMPTY_MESSAGES,
-    shallowEqual
+  const selectConvMessages = useMemo(
+    () =>
+      createSelector(
+        [(state) => state.messages?.byConversation, () => convId],
+        (byConversation, id) =>
+          id ? byConversation?.[id] || EMPTY_MESSAGES : EMPTY_MESSAGES,
+      ),
+    [convId, EMPTY_MESSAGES],
   );
+
+  const convMessages = useSelector(selectConvMessages, shallowEqual);
 
   const canLoadOlder = !!isOnline && !!hasMoreOlder;
   const loaderTimeoutRef = useRef(null);
   const loaderMinVisibleUntil = useRef(0);
   const outboxRef = useRef(new Map()); // tempId -> message
+  const virtuosoRef = useRef(null);
   //console.log("mesajlar:", convMessages);
   /* read throttle/guard */
 
@@ -392,8 +398,8 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
       .filter(
         (m) =>
           !(m.deliveredTo || []).some(
-            (x) => String(x.user?._id || x.user) === String(user?._id)
-          )
+            (x) => String(x.user?._id || x.user) === String(user?._id),
+          ),
       )
       .map((m) => m._id);
     //console.log("convMesages: ", convMessages, userId, toDeliver);
@@ -463,7 +469,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
           actionType: action, // "delivered" | "read"
           by,
           at,
-        })
+        }),
       );
 
       const lastId = ids[ids.length - 1];
@@ -473,7 +479,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
             conversationId: activeConversation?._id,
             lastReadMessageId: lastId,
             meId: by,
-          })
+          }),
         );
       }
     };
@@ -518,14 +524,20 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
     return () => socket.off("messages-before-result", handleMessagesBefore);
   }, [socket, convId]);
 
+  const prevAtBottomDispatchRef = useRef(false);
   const updateAtBottom = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
     const at = isNearBottom(el, 40);
     setIsAtBottom(at);
     wasAtBottomRef.current = at;
-    if (convId) dispatch(setAtBottom({ conversationId: convId, atBottom: at }));
-  }, [convId]);
+
+    // Sadece değer değiştiyse Redux'a dispatch et
+    if (convId && prevAtBottomDispatchRef.current !== at) {
+      dispatch(setAtBottom({ conversationId: convId, atBottom: at }));
+      prevAtBottomDispatchRef.current = at;
+    }
+  }, [convId, dispatch]);
 
   /* Touch/wheel yardımcıları (pull to load) */
   const handleWheel = useCallback(
@@ -534,7 +546,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
       if (!el || loadingOlder) return;
       if (el.scrollTop <= 0 && e.deltaY < 0) loadOlder();
     },
-    [loadOlder, loadingOlder]
+    [loadOlder, loadingOlder],
   );
 
   const handleTouchStart = useCallback((e) => {
@@ -556,7 +568,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
         }
       }
     },
-    [loadOlder, loadingOlder, hasMoreOlder]
+    [loadOlder, loadingOlder, hasMoreOlder],
   );
 
   const handleScroll = useCallback(() => {
@@ -587,6 +599,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
 
   const readBatchRef = useRef(new Set());
   const timerRef = useRef(null);
+  const lastRangeRef = useRef({ startIndex: 0, endIndex: 0 });
 
   const flushReadBatch = useCallback(() => {
     const set = readBatchRef.current;
@@ -603,14 +616,44 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
     dispatch(resetUnread(convId));
   }, [socket, convId, user?._id, dispatch]);
 
-  const queueRead = useCallback(
-    (id) => {
-      if (!id) return;
-      readBatchRef.current.add(id);
-      if (timerRef.current) return;
-      timerRef.current = setTimeout(flushReadBatch, 200);
+  const handleRangeChanged = useCallback(
+    (range) => {
+      if (!convMessages.length || !user?._id) return;
+
+      // Sadece range değiştiyse işle
+      if (
+        range.startIndex === lastRangeRef.current.startIndex &&
+        range.endIndex === lastRangeRef.current.endIndex
+      ) {
+        return;
+      }
+      lastRangeRef.current = range;
+
+      const visibleMessages = convMessages.slice(
+        range.startIndex,
+        range.endIndex + 1,
+      );
+      const unseenIds = visibleMessages
+        .filter((m) => String(m?.sender?._id || m?.sender) !== String(user._id))
+        .filter((m) => {
+          const readBy = Array.isArray(m.readBy) ? m.readBy : [];
+          const meRead = readBy.some(
+            (x) => String(x?.user?._id ?? x?.user) === String(user._id),
+          );
+          return !meRead;
+        })
+        .map((m) => m._id)
+        .filter(Boolean);
+
+      unseenIds.forEach((id) => {
+        readBatchRef.current.add(id);
+      });
+
+      if (unseenIds.length > 0 && !timerRef.current) {
+        timerRef.current = setTimeout(flushReadBatch, 300);
+      }
     },
-    [flushReadBatch]
+    [convMessages, user?._id, flushReadBatch],
   );
 
   useEffect(() => {
@@ -769,13 +812,12 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
 
   const galleryItems = React.useMemo(() => {
     if (!convId) return [];
-
     return (convMessages || [])
       .map((m) => {
         if (m.type === "text" || !m._id) return null;
 
         // fileS store’dan messageId ile media_url al
-        const file = fileS?.[convId]?.[m._id];
+        const file = fileS?.[activeProfile._id]?.[m._id];
         if (!file?.media_url) return null;
 
         const mediaType = classifyType({
@@ -796,7 +838,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
         return null;
       })
       .filter(Boolean);
-  }, [convId, convMessages, fileS]);
+  }, [activeProfile]);
 
   const openLightboxForMedia = useCallback(
     (mediaUrl) => {
@@ -806,12 +848,12 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
         setLightboxOpen(true);
       }
     },
-    [galleryItems]
+    [galleryItems],
   );
   const closeLightbox = () => setLightboxOpen(false);
   const prevLightbox = () =>
     setLightboxIndex(
-      (i) => (i - 1 + galleryItems.length) % galleryItems.length
+      (i) => (i - 1 + galleryItems.length) % galleryItems.length,
     );
   const nextLightbox = () =>
     setLightboxIndex((i) => (i + 1) % galleryItems.length);
@@ -820,62 +862,73 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
   const unread = useSelector(
     (s) =>
       (s.conversations?.list || []).find(
-        (c) => String(c._id) === String(activeConversation?._id)
-      )?.unread || 0
+        (c) => String(c._id) === String(activeConversation?._id),
+      )?.unread || 0,
   );
 
   const scrollToBottom = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!virtuosoRef.current) return;
+    virtuosoRef.current.scrollToIndex({
+      index: convMessages.length - 1,
+      align: "end",
+      behavior: "smooth",
+    });
+
     setTimeout(() => {
       setIsAtBottom(true);
       wasAtBottomRef.current = true;
       if (convId)
         dispatch(setAtBottom({ conversationId: convId, atBottom: true }));
     }, 200);
-  }, [convId, dispatch]);
+  }, [convMessages.length, convId, dispatch]);
 
-  useEffect(() => setProfileOpen(false), [activeConversation?._id]);
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [activeConversation?._id]);
 
-  const unreadDividerIndex = React.useMemo(() => {
-    if (fetchingNew) return null;
+  // const unreadDividerIndex = React.useMemo(() => {
+  //   if (fetchingNew) return null;
 
-    const unseen = collectUnseen(convMessages, user?._id);
-    if (!unseen.length) return null;
-    const firstUnseenIndex = convMessages.findIndex((m) => m._id === unseen[0]);
-    return firstUnseenIndex >= 0 ? firstUnseenIndex : null;
-  }, [activeConversation?._id, fetchingNew]);
+  //   const unseen = collectUnseen(convMessages, user?._id);
+  //   if (!unseen.length) return null;
+  //   const firstUnseenIndex = convMessages.findIndex((m) => m._id === unseen[0]);
+  //   return firstUnseenIndex >= 0 ? firstUnseenIndex : null;
+  // }, [activeConversation?._id, fetchingNew]);
 
   const headerAvatarUrl = React.useMemo(
-    () => getHeaderAvatarKey(activeConversation, user?._id),
-    [activeConversation, user?._id]
+    () => getHeaderAvatarKey(activeProfile, user?._id),
+    [activeConversation, activeProfile],
   );
 
-  //Search
-  useEffect(() => {
-    if (!searchQuery) {
-      setSearchResults([]);
-      setCurrentSearchIndex(0);
-      return;
-    }
-    const matches = convMessages
-      .map((msg, idx) => {
-        if (!msg.text) return null;
-        const text = msg.text.toLowerCase();
-        if (text.includes(searchQuery.toLowerCase())) {
-          return idx;
-        }
-        return null;
-      })
-      .filter((v) => v !== null);
-    setSearchResults(matches);
-    setCurrentSearchIndex(0);
-  }, [searchQuery]);
-
-  const handleSearch = (q) => {
+  const handleSearch = useCallback((q) => {
     setSearchQuery(q);
-  };
+  }, []);
+  const performSearch = useMemo(
+    () =>
+      debounce((query) => {
+        if (!query) {
+          setSearchResults([]);
+          setCurrentSearchIndex(0);
+          return;
+        }
+        const lower = query.toLowerCase();
+        const matches = convMessages
+          .map((msg, idx) => {
+            if (!msg.text) return null;
+            if (msg.text.toLowerCase().includes(lower)) return idx;
+            return null;
+          })
+          .filter((v) => v !== null);
+
+        setSearchResults(matches);
+        setCurrentSearchIndex(0);
+      }, 25),
+    [convMessages],
+  );
+
+  useEffect(() => {
+    performSearch(searchQuery);
+  }, [searchQuery, performSearch]);
 
   const goNext = () => {
     if (searchResults.length === 0) return;
@@ -884,7 +937,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
   const goPrev = () => {
     if (searchResults.length === 0) return;
     setCurrentSearchIndex(
-      (i) => (i - 1 + searchResults.length) % searchResults.length
+      (i) => (i - 1 + searchResults.length) % searchResults.length,
     );
   };
 
@@ -936,7 +989,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
                 conversationId: msg.conversation,
                 messageId: msg._id,
                 status: "failed",
-              })
+              }),
             );
             setSending(false);
             return;
@@ -946,7 +999,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
               conversationId: ack.message.conversation,
               tempId: msg._id,
               message: ack.message,
-            })
+            }),
           );
           if (ack.message.type !== "text") {
             const files = [ack.message].reduce((acc, item) => {
@@ -962,14 +1015,14 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
               upsertFiles({
                 conversationId: ack.message.conversation,
                 files: files,
-              })
+              }),
             );
           }
           setSending(false);
-        }
+        },
       );
     },
-    [socket]
+    [socket],
   );
 
   useEffect(() => {
@@ -988,21 +1041,10 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
       {activeConversation && (
         <>
           <ChatHeader
-            name={
-              activeConversation?.type === "private"
-                ? activeConversation?.members[0].user._id === user?._id
-                  ? activeConversation?.members[1].user.username
-                  : activeConversation?.members[0].user.username
-                : activeConversation?.name
-            }
-            onOpenProfile={() => setProfileOpen(true)}
             activeConversation={activeConversation}
+            setProfileOpen={setProfileOpen}
             avatar={headerAvatarUrl || "/images/default-avatar.jpg"}
-            userId={user?._id}
-            setActiveConversation={setActiveConversation}
-            setactiveConversationId={setactiveConversationId}
             socket={socket}
-            user={user}
             setOutgoingCall={setOutgoingCall}
             onSearch={handleSearch}
             searchQuery={searchQuery}
@@ -1015,12 +1057,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
           {isProfileOpen && (
             <ProfileDrawer
               onClose={() => setProfileOpen(false)}
-              conversation={activeConversation}
               meId={user?._id}
-              mediaThumbs={galleryItems
-                .filter((i) => i.type === "image" || i.type === "video")
-                .slice(0, 9)}
-              allMedia={galleryItems} // [{src,type,alt}]
               onOpenLightbox={(start) => {
                 // PANEL KAPANMADAN GLOBAL LB
                 setLightboxIndex(start);
@@ -1035,14 +1072,11 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
           )}
         </>
       )}
+
       <div
         className={`chat__messages ${!hasMoreOlder ? "no-more" : ""}`}
         aria-busy={loadingOlder ? "true" : "false"}
         ref={listRef}
-        onScroll={handleScroll}
-        onWheel={canLoadOlder ? handleWheel : undefined}
-        onTouchStart={canLoadOlder ? handleTouchStart : undefined}
-        onTouchMove={canLoadOlder ? handleTouchMove : undefined}
         style={{
           overflowY: "auto",
           position: "relative",
@@ -1085,83 +1119,98 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
             )}
           </>
         )}
+        <Virtuoso
+          ref={virtuosoRef}
+          data={convMessages}
+          className="virtual"
+          followOutput={isAtBottom ? "smooth" : false}
+          rangeChanged={handleRangeChanged}
+          atBottomStateChange={(atBottom) => {
+            setIsAtBottom(atBottom);
+            wasAtBottomRef.current = atBottom;
+            if (convId)
+              dispatch(setAtBottom({ conversationId: convId, atBottom }));
+          }}
+          startReached={() => {
+            if (hasMoreOlder && !loadingOlder && isOnline) {
+              loadOlder();
+            }
+          }}
+          componentsProps={{
+            Scroller: {
+              className: "chat__messages-scroller",
+              onScroll: () => {
+                if (!virtuosoRef.current) return;
+                virtuosoRef.current.getState((state) => {
+                  const atBottom =
+                    state.scrollTop + state.viewportHeight >=
+                    state.scrollHeight - 40;
 
-        {convMessages?.map((msg, index) => {
-          const isMe = (msg?.sender?._id || msg?.sender) === user?._id;
-          const isMatch = searchResults.includes(index);
-          const isCurrentMatch =
-            isMatch && searchResults[currentSearchIndex] === index;
-          let isAvatar;
-          let isName;
-          if (convMessages[index + 1]?.sender !== msg.sender) {
-            isName = true;
-          }
-          if (beforeMessage !== msg.sender) {
-            beforeMessage = msg.sender;
-            isAvatar = true;
-          }
+                  setIsAtBottom(atBottom);
+                  wasAtBottomRef.current = atBottom;
 
-          // === Gün değişti mi kontrol et ===
-          const msgDate = new Date(msg.createdAt).toDateString();
-          const showDateDivider = msgDate !== prevDate;
-          prevDate = msgDate;
+                  if (convId)
+                    dispatch(setAtBottom({ conversationId: convId, atBottom }));
 
-          return (
-            <React.Fragment key={msg._id || `i-${index}`}>
-              {showDateDivider && (
-                <div className="date-divider">
-                  <span>{formatDateDivider(msg.createdAt)}</span>
-                </div>
-              )}
-              <VisibleMessage
-                msg={msg}
-                index={index}
-                isMe={isMe}
-                onVisible={queueRead}
-                renderMessageMedia={renderMessageMedia}
-                computeStatus={(m) =>
-                  computeEffectiveStatus(m, activeConversation, user?._id)
-                }
-                isCurrentMatch={isCurrentMatch}
-                conversation={activeConversation}
-                isAvatar={isAvatar}
-                isName={isName}
-              />
-            </React.Fragment>
-          );
-        })}
-        {/* {convMessages.map((msg, index) => {
-          const isMe = (msg?.sender?._id || msg?.sender) === userId;
-          const isMatch = searchResults.includes(index);
-          const isCurrentMatch =
-            isMatch && searchResults[currentSearchIndex] === index;
-          let isAvatar;
-          let isName;
-          if (convMessages[index + 1]?.sender !== msg.sender) {
-            isName = true;
-          }
-          if (beforeMessage !== msg.sender) {
-            beforeMessage = msg.sender;
-            isAvatar = true;
-          }
-          return (
-            <VisibleMessage
-              key={msg._id || `i-${index}`}
-              msg={msg}
-              index={index}
-              isMe={isMe}
-              onVisible={queueRead} // ✅ görünür olunca batch'e ekle
-              renderMessageMedia={renderMessageMedia}
-              computeStatus={(m) =>
-                computeEffectiveStatus(m, activeConversation, userId)
-              }
-              isCurrentMatch={isCurrentMatch} // arama highlight'ını senin state'inden geçirebilirsin
-              conversation={activeConversation}
-              isAvatar={isAvatar}
-              isName={isName}
-            />
-          );
-        })} */}
+                  // Yukarıya gelindiyse eski mesajları yükle
+                  if (
+                    state.scrollTop <= 0 &&
+                    hasMoreOlder &&
+                    !loadingOlder &&
+                    isOnline
+                  ) {
+                    loadOlder();
+                  }
+                });
+              },
+            },
+            List: { className: "chat__messages-list" },
+            Item: { className: "chat__messages-item" },
+          }}
+          itemContent={(index, msg) => {
+            const isMe = (msg?.sender?._id || msg?.sender) === user?._id;
+            const isMatch = searchResults.includes(index);
+            const isCurrentMatch =
+              isMatch && searchResults[currentSearchIndex] === index;
+
+            let isAvatar, isName;
+            if (convMessages[index + 1]?.sender !== msg.sender) isName = true;
+            if (index === 0 || convMessages[index - 1]?.sender !== msg.sender)
+              isAvatar = true;
+
+            // === Gün değişti mi kontrol et ===
+            const prevMsg = convMessages[index - 1];
+            const prevDateStr = prevMsg
+              ? new Date(prevMsg.createdAt).toDateString()
+              : null;
+            const msgDate = new Date(msg.createdAt).toDateString();
+            const showDateDivider = msgDate !== prevDateStr;
+
+            return (
+              <React.Fragment key={msg._id || `i-${index}`}>
+                {showDateDivider && (
+                  <div className="date-divider">
+                    <span>{formatDateDivider(msg.createdAt)}</span>
+                  </div>
+                )}
+                <VisibleMessage
+                  msg={msg}
+                  index={index}
+                  isMe={isMe}
+                  renderMessageMedia={renderMessageMedia}
+                  computeStatus={(m) =>
+                    computeEffectiveStatus(m, activeConversation, user?._id)
+                  }
+                  isCurrentMatch={isCurrentMatch}
+                  conversation={activeConversation}
+                  isAvatar={isAvatar}
+                  isName={isName}
+                />
+              </React.Fragment>
+            );
+          }}
+        />
+
         <div ref={endRef} />
         {!isAtBottom && unread > 0 && (
           <div className="chat__scrollToBottom">
@@ -1213,7 +1262,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
             addOptimisticMessage({
               conversationId: tempMsg.conversation,
               message: tempMsg,
-            })
+            }),
           );
         }}
         onAckReplace={(tempId, serverMsg) => {
@@ -1222,7 +1271,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
               conversationId: serverMsg.conversation,
               tempId,
               message: serverMsg,
-            })
+            }),
           );
           if (serverMsg.type !== "text") {
             const files = [serverMsg].reduce((acc, item) => {
@@ -1238,7 +1287,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
               upsertFiles({
                 conversationId: serverMsg.conversation,
                 files: files,
-              })
+              }),
             );
           }
         }}
@@ -1248,7 +1297,7 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
               conversationId: conversationId,
               messageId: tempId,
               status,
-            })
+            }),
           );
         }}
         addoutboxRef={(msg) => {
@@ -1256,16 +1305,10 @@ const ChatPanel = ({ socket, fetchingNew, isOnline, setOutgoingCall }) => {
         }}
         isOnline={isOnline}
         socket={socket}
-        conversationId={activeConversation?._id}
-        conversation={activeConversation}
-        userId={user?._id}
         file={file}
         setFile={setFile}
         filePreviewUrl={filePreviewUrl}
         setFilePreviewUrl={setFilePreviewUrl}
-        activeConversation={activeConversation}
-        setActiveConversation={setActiveConversation}
-        setactiveConversationId={setactiveConversationId}
       />
       {isLightboxOpen && galleryItems.length > 0 && (
         <MediaLightbox

@@ -4,12 +4,12 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useCallback,
 } from "react";
 
 const UserContext = createContext(null);
 
 export function UserContextProvider({ children }) {
-  // ✅ SSR-safe initial load + parse guard
   const [user, setUser] = useState(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -20,19 +20,26 @@ export function UserContextProvider({ children }) {
     }
   });
 
-  // ✅ localStorage senkronizasyonu (token dahil)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (user) {
-      localStorage.setItem("user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-    }
+
+    const timeoutId = setTimeout(() => {
+      if (user) {
+        try {
+          localStorage.setItem("user", JSON.stringify(user));
+        } catch (err) {
+          console.warn("localStorage yazılamadı:", err);
+        }
+      } else {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
+    }, 100); // 100ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [user]);
 
-  // ✅ temiz çıkış (logout)
-  const clearUser = () => {
+  const clearUser = useCallback(() => {
     try {
       localStorage.removeItem("user");
       localStorage.removeItem("token");
@@ -40,10 +47,12 @@ export function UserContextProvider({ children }) {
       console.warn("localStorage temizlenemedi:", err);
     }
     setUser(null);
-  };
+  }, []);
 
-  // ✅ stabilize context referansı — gereksiz render’ları önler
-  const value = useMemo(() => ({ user, setUser, clearUser }), [user]);
+  const value = useMemo(
+    () => ({ user, setUser, clearUser }),
+    [user, clearUser],
+  );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }

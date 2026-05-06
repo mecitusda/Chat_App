@@ -2,6 +2,7 @@ import { useState } from "react";
 import useScrollAnimation from "../hooks/UseScrollAnimation";
 import { GoTriangleLeft } from "react-icons/go";
 import { FaQuestion } from "react-icons/fa";
+
 const faqData = [
   {
     question: "Scriber nedir?",

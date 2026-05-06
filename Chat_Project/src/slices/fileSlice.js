@@ -122,7 +122,7 @@ const fileSlice = createSlice({
   name: "files",
   initialState,
   reducers: {
-    /** ✅ İlk yükleme için doğrudan set (örnek: mesaj geçmişi çekildiğinde) */
+
     setFiles(state, action) {
       const { conversationId, files } = action.payload || {};
       if (!conversationId) return;
@@ -134,10 +134,7 @@ const fileSlice = createSlice({
       }
     },
 
-    /**
-     * ✅ Upsert – sadece değişen dosyaları merge et.
-     * files param: { [messageId]: { media_url, expiresAt, ... } }
-     */
+ 
     upsertFiles(state, action) {
       const { conversationId, files } = action.payload || {};
       if (!conversationId || !files) return;
@@ -150,7 +147,6 @@ const fileSlice = createSlice({
       }
     },
 
-    /** ✅ Belirli media_key'leri sil */
     removeFiles(state, action) {
       const { conversationId, mediaKeys = [] } = action.payload || {};
       if (!conversationId || !Array.isArray(mediaKeys)) return;
@@ -169,7 +165,7 @@ const fileSlice = createSlice({
       }
     },
 
-    /** ✅ Bir konuşmanın tüm dosyalarını temizle */
+
     clearConversationFiles(state, action) {
       const { conversationId } = action.payload || {};
       if (!conversationId) return;
@@ -178,7 +174,7 @@ const fileSlice = createSlice({
       }
     },
 
-    /** ✅ Expire olmuşları at */
+  
     purgeExpired(state, action) {
       const { conversationId, now = Date.now() } = action.payload || {};
       if (!conversationId) return;

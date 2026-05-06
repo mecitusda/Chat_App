@@ -63,7 +63,7 @@ const paginationSlice = createSlice({
   name: "paginations",
   initialState,
   reducers: {
-    /** ✅ hasMore değeri değiştiyse güncelle */
+    
     setHasMore(state, action) {
       const { conversationId, hasMore } = action.payload || {};
       if (!conversationId) return;
@@ -79,7 +79,7 @@ const paginationSlice = createSlice({
       }
     },
 
-    /** ✅ oldestMessageId değiştiyse güncelle */
+
     setOldestMessageId(state, action) {
       const { conversationId, messageId } = action.payload || {};
       if (!conversationId) return;
@@ -95,7 +95,7 @@ const paginationSlice = createSlice({
       }
     },
 
-    /** ✅ sadece mevcutla farklıysa reset */
+
     resetPaginationForConversation(state, action) {
       const { conversationId } = action.payload || {};
       if (!conversationId) return;
@@ -127,9 +127,7 @@ export const {
 
 export default paginationSlice.reducer;
 
-/* ✅ MEMOIZED SELECTORS */
 
-// küçük cache tutarak referans sabitliği sağla
 const defaultPage = Object.freeze({
   hasMore: true,
   oldestMessageId: null,

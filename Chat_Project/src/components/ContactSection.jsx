@@ -23,12 +23,12 @@ export default function ContactSection() {
     try {
       const { data } = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/contact`,
-        formData
+        formData,
       );
 
       if (data.success) {
         showNotification(
-          "✅ Mesajınız alınmıştır. En kısa sürede dönüş yapılacaktır."
+          "✅ Mesajınız alınmıştır. En kısa sürede dönüş yapılacaktır.",
         );
         setFormData({ name: "", email: "", phone: "", message: "" });
       } else {
@@ -40,7 +40,7 @@ export default function ContactSection() {
       // 🔥 Özel limit kontrolü
       if (err.response?.status === 429) {
         showNotification(
-          "🚫 Günlük mesaj limitine ulaştınız. Lütfen yarın tekrar deneyin."
+          "🚫 Günlük mesaj limitine ulaştınız. Lütfen yarın tekrar deneyin.",
         );
       } else if (err.response?.data?.message) {
         showNotification("⚠️ " + err.response.data.message);
